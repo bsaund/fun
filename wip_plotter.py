@@ -1,4 +1,4 @@
-from plotter import TimeSeriesPlotter
+from utils.plotter import TimeSeriesPlotter
 import time
 import math
 

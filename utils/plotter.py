@@ -22,6 +22,10 @@ class TimeSeriesPlotter:
         return plt.fignum_exists(self.fig.number)
 
     def update(self, x, y_dict: typing.Dict[str, float]):
+        if not self.is_open():
+            print("Figure has been closed")
+            return
+
         for field, y in y_dict.items():
             hl = self.plots[field]
             hl.set_xdata(np.append(hl.get_xdata(), x))
@@ -30,8 +34,6 @@ class TimeSeriesPlotter:
             self.axes[field].relim()
             border = (max(y_data) - min(y_data)) * 0.05
             self.axes[field].set_ylim([min(y_data) - border, max(y_data) + border])
-            # self.axes[field].set_xlim([0, x])
-            # self.axes[field].au
         for field, ax in self.axes.items():
             ax.set_xlim([max(0, x - self.max_time_interval), max(x, self.min_time)])
         plt.draw()
