@@ -84,7 +84,6 @@ Talos""".split("\n")
 # ask_list = [("robot", r) for r in robots] + [("person", p) for p in people]
 ask_list = [("person", r) for r in robots] + [("robot", p) for p in people]
 random.shuffle(ask_list)
-print(ask_list)
 
 
 def ask(imp):
@@ -94,6 +93,8 @@ def ask(imp):
     # print(f'{Fore.MAGENTA}{classification}{Style.RESET_ALL}')
     return classification
 
+
+# ask_list = ask_list * 10
 
 wrong_count = 0
 for correct_answer, character in ask_list:
