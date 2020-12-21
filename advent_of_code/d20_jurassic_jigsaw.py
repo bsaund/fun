@@ -1817,7 +1817,9 @@ searched_image = convolve2d(actual_image, sea_monster, mode='valid')
 
 for oriented_monster in all_orientations(sea_monster):
     searched_image = convolve2d(actual_image, oriented_monster, mode='valid')
+    sea_monster_squares = np.sum(searched_image == sea_monster_count) * sea_monster_count
+    print(np.sum(actual_image) - sea_monster_squares)
     if np.max(searched_image) == sea_monster_count:
         sea_monster_squares = np.sum(searched_image == sea_monster_count) * sea_monster_count
         print(np.sum(actual_image) - sea_monster_squares)
-        break
+        # break
