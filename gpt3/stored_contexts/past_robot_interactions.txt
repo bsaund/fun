@@ -1,0 +1,6 @@
+Summarize these full sentences.
+go home => I will move
+grab the blue ball => I will pick
+put this on the floor => I will place
+pick up => I will pick
+get me the cup => I will pick
