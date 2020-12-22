@@ -81,14 +81,14 @@ Astro Boy
 Maeve Millay
 Talos""".split("\n")
 
-# ask_list = [("robot", r) for r in robots] + [("person", p) for p in people]
-ask_list = [("person", r) for r in robots] + [("robot", p) for p in people]
+ask_list = [("robot", r) for r in robots] + [("person", p) for p in people]
+# ask_list = [("person", r) for r in robots] + [("robot", p) for p in people]
 random.shuffle(ask_list)
 
 
 def ask(imp):
     prompt = prompt_primer + imp + " =>"
-    classification = query_most_likely(prompt, allowed_set, print_probs=False)
+    classification = query_most_likely(prompt, allowed_set, print_probs=False, engine='davinci')
     # print(f'{Fore.GREEN}{imp} is a {Style.RESET_ALL}', end='')
     # print(f'{Fore.MAGENTA}{classification}{Style.RESET_ALL}')
     return classification
@@ -107,7 +107,7 @@ for correct_answer, character in ask_list:
         print(f'{Fore.MAGENTA}{character} is a {Fore.RED}{correct_answer} but classified as {suspected_ans}{Style.RESET_ALL}')
 
     # feedback = input("Y/n ")
-    feedback = {True: "Y", False: "n"}[got_it_correct]
+    feedback = "Y" if got_it_correct else "n"
     if feedback == "n":
         wrong_count += 1
         correct_answer = [a for a in allowed_set if a != suspected_ans][0]
