@@ -4,7 +4,7 @@ from colorama import Fore, Style
 from gpt3.utils import query_most_likely
 import random
 
-openai.api_key = get_secret_key(filename="/home/bsaund/.openai_key")
+openai.api_key = get_secret_key()
 
 allowed_set = ["robot", "person"]
 
