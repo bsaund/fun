@@ -1,8 +1,8 @@
 import openai
 
 
-def query_most_likely(query, allowed_set, print_probs=False):
-    response = openai.Completion.create(engine="davinci", prompt=query, max_tokens=1, logprobs=100, n=1)
+def query_most_likely(query, allowed_set, print_probs=False, engine='davinci'):
+    response = openai.Completion.create(engine=engine, prompt=query, max_tokens=1, logprobs=100, n=1)
     logprobs = response['choices'][0]['logprobs']['top_logprobs'][0]
     found_actions = []
     for item in allowed_set:
