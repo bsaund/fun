@@ -2,7 +2,7 @@ import openai
 from gpt3.key import get_secret_key
 from colorama import Fore, Style
 
-openai.api_key = get_secret_key(filename="/home/bsaund/.openai_key")
+openai.api_key = get_secret_key()
 
 
 prompt = """Pick up the red container"""
