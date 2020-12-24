@@ -442,48 +442,49 @@ swswswswswnwseswswseswenwwswnesweswsw
 senwseseeeeweenesenesweseeseeseswse"""
 
 import numpy as np
+import re
+from collections import defaultdict
 
-# tiles = tmp_tiles
-tiles = act_tiles
-tiles = tiles.replace('ne', 'q').replace('se', 'z').replace('sw', 'c'). \
-    replace('e', 'a').replace('nw', 'e').replace('w', 'd').split('\n')
+tiles = tmp_tiles
+# tiles = act_tiles
 
-dir_map = {'a': [-1, 0], 'q': [0, 1], 'z': [-1, -1], 'c': [0, -1], 'd': [1, 0], 'e': [1, 1]}
-# print(tiles)
-flip_count = dict()
-for tile in tiles:
+dir_map = {'e': [-1, 0], 'se': [-1, -1], 'sw': [0, -1], 'w': [1, 0], 'nw': [1, 1], 'ne': [0, 1]}
+state_of_tile = defaultdict(lambda: 0)
+
+for row in tiles.split('\n'):
+    instrs = re.findall('(se|sw|nw|ne|e|w)', row)
+    # print(instrs)
     pose = np.array([0, 0])
-    for d in tile:
-        pose += np.array(dir_map[d])
-    pose = (pose[0], pose[1])
-    if pose not in flip_count:
-        flip_count[pose] = 0
-    flip_count[pose] += 1
+    for instr in instrs:
+        pose += np.array(dir_map[instr])
+    pose = tuple(pose.tolist())
+    state_of_tile[pose] = not state_of_tile[pose]
 
 print('Part 1')
-print(sum([1 for _, fp in flip_count.items() if fp % 2]))
-
-black_tiles = {pose for pose, count in flip_count.items() if count % 2}
+print(sum(state_of_tile.values()))
 
 
-def update(bt):
-    black_neighbor_count = dict()
-    for coord in bt:
-        for _, d in dir_map.items():
-            neighbor = tuple((np.array(coord) + np.array(d)).tolist())
-            if neighbor not in black_neighbor_count:
-                black_neighbor_count[neighbor] = 0
-            black_neighbor_count[neighbor] += 1
-    new_bt = set()
-    for coord, count in black_neighbor_count.items():
-        if coord in black_tiles and 0 < count < 2:
-            new_bt.add(coord)
+# Part 2
+def neighbors(t):
+    for v in dir_map.values():
+        yield tuple((np.array(t) + np.array(v)).tolist())
+
+
+def update(on_tiles):
+    neighbor_count = defaultdict(lambda: 0)
+    for t in on_tiles:
+        for n in neighbors(t):
+            neighbor_count[n] += 1
+    new_tiles = set()
+    for t, count in neighbor_count.items():
+        if t in on_tiles and 0 < count < 2:
+            new_tiles.add(t)
         elif count == 2:
-            new_bt.add(coord)
-    return new_bt
+            new_tiles.add(t)
+    return new_tiles
 
 
+on_tiles = [t for t, state in state_of_tile.items() if state]
 for i in range(0, 101):
-    print(f"Day {i}: {len(black_tiles)}")
-    black_tiles = update(black_tiles)
-
+    print(f"day {i}: {len(on_tiles)}")
+    on_tiles = update(on_tiles)
