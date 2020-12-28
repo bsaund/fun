@@ -20,12 +20,17 @@ std::string tmp_data =
 
 void part_1(const std::vector<std::string>& data) {
   std::cout << "--------- PART 1 -----------\n";
+  // Part 1
+
   for (const auto& line : data) {
     sscanf(line.c_str(), "");
   }
 }
 
-void part_2(const std::vector<std::string>& data) { std::cout << "\n\n\n--------- PART 2 -----------\n"; }
+void part_2(const std::vector<std::string>& data) {
+  std::cout << "\n\n\n--------- PART 2 -----------\n";
+  // Part 2
+}
 
 int main() {
   auto data_str = read_from_file("d1");

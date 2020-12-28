@@ -27,6 +27,60 @@
 					<DistClean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
+			<Target title="edit_cache">
+				<Option working_dir="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug"/>
+				<Option type="4"/>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="d4">
+				<Option output="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/d4" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/usr/include/c++/9"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/9"/>
+					<Add directory="/usr/include/c++/9/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 d4"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="d4/fast">
+				<Option output="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/d4" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/usr/include/c++/9"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/9"/>
+					<Add directory="/usr/include/c++/9/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 d4/fast"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
 			<Target title="cpp">
 				<Option output="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/cpp" prefix_auto="0" extension_auto="0"/>
 				<Option working_dir="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug"/>
@@ -115,6 +169,50 @@
 					<DistClean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
+			<Target title="d3">
+				<Option output="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/d3" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/usr/include/c++/9"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/9"/>
+					<Add directory="/usr/include/c++/9/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 d3"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
+			<Target title="d3/fast">
+				<Option output="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/d3" prefix_auto="0" extension_auto="0"/>
+				<Option working_dir="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug"/>
+				<Option object_output="./"/>
+				<Option type="1"/>
+				<Option compiler="gcc"/>
+				<Compiler>
+					<Add directory="/usr/include/c++/9"/>
+					<Add directory="/usr/include/x86_64-linux-gnu/c++/9"/>
+					<Add directory="/usr/include/c++/9/backward"/>
+					<Add directory="/usr/lib/gcc/x86_64-linux-gnu/9/include"/>
+					<Add directory="/usr/local/include"/>
+					<Add directory="/usr/include/x86_64-linux-gnu"/>
+					<Add directory="/usr/include"/>
+				</Compiler>
+				<MakeCommands>
+					<Build command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 d3/fast"/>
+					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
+					<Clean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+					<DistClean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
+				</MakeCommands>
+			</Target>
 			<Target title="d1">
 				<Option output="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/d1" prefix_auto="0" extension_auto="0"/>
 				<Option working_dir="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug"/>
@@ -159,16 +257,6 @@
 					<DistClean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
 				</MakeCommands>
 			</Target>
-			<Target title="edit_cache">
-				<Option working_dir="/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug"/>
-				<Option type="4"/>
-				<MakeCommands>
-					<Build command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 edit_cache"/>
-					<CompileFile command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 &quot;$file&quot;"/>
-					<Clean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
-					<DistClean command="/usr/bin/make -j8 -f &quot;/home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debug/Makefile&quot;  VERBOSE=1 clean"/>
-				</MakeCommands>
-			</Target>
 		</Build>
 		<Unit filename="/home/bsaund/coding/fun/advent_of_code/c_aoc/d1.cpp">
 			<Option target="d1"/>
@@ -177,14 +265,26 @@
 			<Option target="cpp"/>
 			<Option target="d2"/>
 		</Unit>
+		<Unit filename="/home/bsaund/coding/fun/advent_of_code/c_aoc/d3.cpp">
+			<Option target="cpp"/>
+			<Option target="d3"/>
+		</Unit>
+		<Unit filename="/home/bsaund/coding/fun/advent_of_code/c_aoc/d4.cpp">
+			<Option target="d4"/>
+			<Option target="cpp"/>
+		</Unit>
 		<Unit filename="/home/bsaund/coding/fun/advent_of_code/c_aoc/include/file_parsing.h">
+			<Option target="d4"/>
 			<Option target="cpp"/>
 			<Option target="d2"/>
+			<Option target="d3"/>
 			<Option target="d1"/>
 		</Unit>
 		<Unit filename="/home/bsaund/coding/fun/advent_of_code/c_aoc/include/printing.h">
+			<Option target="d4"/>
 			<Option target="cpp"/>
 			<Option target="d2"/>
+			<Option target="d3"/>
 			<Option target="d1"/>
 		</Unit>
 		<Unit filename="/home/bsaund/coding/fun/advent_of_code/c_aoc/template.cpp">
