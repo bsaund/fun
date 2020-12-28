@@ -76,17 +76,6 @@ CMAKE_BINARY_DIR = /home/bsaund/coding/fun/advent_of_code/c_aoc/cmake-build-debu
 #=============================================================================
 # Targets provided globally by CMake.
 
-# Special rule for the target edit_cache
-edit_cache:
-	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
-	/home/bsaund/.local/share/JetBrains/Toolbox/apps/CLion/ch-0/202.7660.37/bin/cmake/linux/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
-.PHONY : edit_cache
-
-# Special rule for the target edit_cache
-edit_cache/fast: edit_cache
-
-.PHONY : edit_cache/fast
-
 # Special rule for the target rebuild_cache
 rebuild_cache:
 	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "Running CMake to regenerate build system..."
@@ -97,6 +86,17 @@ rebuild_cache:
 rebuild_cache/fast: rebuild_cache
 
 .PHONY : rebuild_cache/fast
+
+# Special rule for the target edit_cache
+edit_cache:
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --cyan "No interactive CMake dialog available..."
+	/home/bsaund/.local/share/JetBrains/Toolbox/apps/CLion/ch-0/202.7660.37/bin/cmake/linux/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+.PHONY : edit_cache
+
+# Special rule for the target edit_cache
+edit_cache/fast: edit_cache
+
+.PHONY : edit_cache/fast
 
 # The main all target
 all: cmake_check_build_system
@@ -131,19 +131,6 @@ depend:
 .PHONY : depend
 
 #=============================================================================
-# Target rules for targets named d1
-
-# Build rule for target.
-d1: cmake_check_build_system
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 d1
-.PHONY : d1
-
-# fast build rule for target.
-d1/fast:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/d1.dir/build.make CMakeFiles/d1.dir/build
-.PHONY : d1/fast
-
-#=============================================================================
 # Target rules for targets named cpp
 
 # Build rule for target.
@@ -155,6 +142,32 @@ cpp: cmake_check_build_system
 cpp/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp.dir/build.make CMakeFiles/cpp.dir/build
 .PHONY : cpp/fast
+
+#=============================================================================
+# Target rules for targets named d2
+
+# Build rule for target.
+d2: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 d2
+.PHONY : d2
+
+# fast build rule for target.
+d2/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/d2.dir/build.make CMakeFiles/d2.dir/build
+.PHONY : d2/fast
+
+#=============================================================================
+# Target rules for targets named d1
+
+# Build rule for target.
+d1: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 d1
+.PHONY : d1
+
+# fast build rule for target.
+d1/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/d1.dir/build.make CMakeFiles/d1.dir/build
+.PHONY : d1/fast
 
 d1.o: d1.cpp.o
 
@@ -182,6 +195,36 @@ d1.s: d1.cpp.s
 d1.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/d1.dir/build.make CMakeFiles/d1.dir/d1.cpp.s
 .PHONY : d1.cpp.s
+
+d2.o: d2.cpp.o
+
+.PHONY : d2.o
+
+# target to build an object file
+d2.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp.dir/build.make CMakeFiles/cpp.dir/d2.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/d2.dir/build.make CMakeFiles/d2.dir/d2.cpp.o
+.PHONY : d2.cpp.o
+
+d2.i: d2.cpp.i
+
+.PHONY : d2.i
+
+# target to preprocess a source file
+d2.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp.dir/build.make CMakeFiles/cpp.dir/d2.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/d2.dir/build.make CMakeFiles/d2.dir/d2.cpp.i
+.PHONY : d2.cpp.i
+
+d2.s: d2.cpp.s
+
+.PHONY : d2.s
+
+# target to generate assembly for a file
+d2.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp.dir/build.make CMakeFiles/cpp.dir/d2.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/d2.dir/build.make CMakeFiles/d2.dir/d2.cpp.s
+.PHONY : d2.cpp.s
 
 template.o: template.cpp.o
 
@@ -220,9 +263,13 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... cpp"
 	@echo "... d1"
+	@echo "... d2"
 	@echo "... d1.o"
 	@echo "... d1.i"
 	@echo "... d1.s"
+	@echo "... d2.o"
+	@echo "... d2.i"
+	@echo "... d2.s"
 	@echo "... template.o"
 	@echo "... template.i"
 	@echo "... template.s"
