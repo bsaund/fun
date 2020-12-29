@@ -15,4 +15,14 @@ void print(const std::vector<std::string> &v) {
   }
 }
 
+template <typename T>
+void print(const std::vector<T> &v){
+  for(const T& val: v){
+    std::cout << val << ", ";
+  }
+  std::cout << "\n";
+}
+
+
+
 #endif  // CPP_PRINTING_H

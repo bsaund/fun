@@ -131,6 +131,19 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named d5
+
+# Build rule for target.
+d5: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 d5
+.PHONY : d5
+
+# fast build rule for target.
+d5/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/d5.dir/build.make CMakeFiles/d5.dir/build
+.PHONY : d5/fast
+
+#=============================================================================
 # Target rules for targets named d3
 
 # Build rule for target.
@@ -355,6 +368,36 @@ d4.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp.dir/build.make CMakeFiles/cpp.dir/d4.cpp.s
 .PHONY : d4.cpp.s
 
+d5.o: d5.cpp.o
+
+.PHONY : d5.o
+
+# target to build an object file
+d5.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/d5.dir/build.make CMakeFiles/d5.dir/d5.cpp.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp.dir/build.make CMakeFiles/cpp.dir/d5.cpp.o
+.PHONY : d5.cpp.o
+
+d5.i: d5.cpp.i
+
+.PHONY : d5.i
+
+# target to preprocess a source file
+d5.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/d5.dir/build.make CMakeFiles/d5.dir/d5.cpp.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp.dir/build.make CMakeFiles/cpp.dir/d5.cpp.i
+.PHONY : d5.cpp.i
+
+d5.s: d5.cpp.s
+
+.PHONY : d5.s
+
+# target to generate assembly for a file
+d5.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/d5.dir/build.make CMakeFiles/d5.dir/d5.cpp.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/cpp.dir/build.make CMakeFiles/cpp.dir/d5.cpp.s
+.PHONY : d5.cpp.s
+
 template.o: template.cpp.o
 
 .PHONY : template.o
@@ -396,6 +439,7 @@ help:
 	@echo "... d2"
 	@echo "... d3"
 	@echo "... d4"
+	@echo "... d5"
 	@echo "... abseil_test.o"
 	@echo "... abseil_test.i"
 	@echo "... abseil_test.s"
@@ -411,6 +455,9 @@ help:
 	@echo "... d4.o"
 	@echo "... d4.i"
 	@echo "... d4.s"
+	@echo "... d5.o"
+	@echo "... d5.i"
+	@echo "... d5.s"
 	@echo "... template.o"
 	@echo "... template.i"
 	@echo "... template.s"
