@@ -1,7 +1,10 @@
 #include <fstream>
 #include <iostream>
+#include <set>
 #include <vector>
 
+#include "absl/strings/match.h"
+#include "absl/strings/str_join.h"
 #include "include/file_parsing.h"
 #include "include/printing.h"
 
@@ -19,6 +22,21 @@ std::string tmp_data =
     "\n"
     "hcl:#cfa07d eyr:2025 pid:166559648\n"
     "iyr:2011 ecl:brn hgt:59in";
+
+std::string tmp_invalid_data =
+    "eyr:1972 cid:100\n"
+    "hcl:#18171d ecl:amb hgt:170 pid:186cm iyr:2018 byr:1926\n"
+    "\n"
+    "iyr:2019\n"
+    "hcl:#602927 eyr:1967 hgt:170cm\n"
+    "ecl:grn pid:012533040 byr:1946\n"
+    "\n"
+    "hcl:dab227 iyr:2012\n"
+    "ecl:brn hgt:182cm pid:021572410 eyr:2020 byr:1992 cid:277\n"
+    "\n"
+    "hgt:59cm ecl:zzz\n"
+    "eyr:2038 hcl:74454a iyr:2023\n"
+    "pid:3556412378 byr:2007";
 
 // std::string read_from_file(const std::string &day) {
 //    std::ifstream f(day + ".txt");
@@ -67,6 +85,7 @@ void part_2(const std::vector<std::string>& data) {
   int valid_count = 0;
   for (const std::string& line : data) {
     int field_count = 0;
+    std::set<std::string> valid_fields;
     std::string token;
     size_t pos_start = 0;
     while (pos_start < line.length()) {
@@ -74,35 +93,38 @@ void part_2(const std::vector<std::string>& data) {
       sep = std::min(sep, line.find('\n', pos_start));
       sep = std::min(sep, line.length());
       //      std::cout << "sep: " << sep << "\n";
-      std::string field(100, '\0');
-      sscanf(line.substr(pos_start, sep - pos_start).c_str(), "%3c:", field.c_str());
-      std::string contents = line.substr(pos_start + 4, sep - pos_start - 4);
+      char field_char[10];
+      sscanf(line.substr(pos_start, sep - pos_start).c_str(), "%3c:", field_char);
+      std::string field(field_char);
+      std::string contents_str = line.substr(pos_start + 4, sep - pos_start - 4);
+      auto contents = contents_str.c_str();
 
       pos_start = sep + 1;
+      //      std::cout << sep << "\n";
 
       if (field.starts_with("cid")) {
         continue;
       }
 
-//      std::cout << field << ": " << contents << "\n";
+      //      std::cout << field << ": " << contents << "\n";
       if (field.starts_with("byr")) {
         int birth_year;
-        sscanf(contents.c_str(), "%d", &birth_year);
-//        std::cout << "Birth year " << birth_year << "\n";
+        sscanf(contents, "%d", &birth_year);
+        //        std::cout << "Birth year " << birth_year << "\n";
         if (birth_year < 1920 || birth_year > 2002) {
           continue;
         }
       }
       if (field.starts_with("iyr")) {
         int issue_year;
-        sscanf(contents.c_str(), "%d", &issue_year);
+        sscanf(contents, "%d", &issue_year);
         if (issue_year < 2010 or issue_year > 2020) {
           continue;
         }
       }
       if (field.starts_with("eyr")) {
         int exp_year;
-        sscanf(contents.c_str(), "%d", &exp_year);
+        sscanf(contents, "%d", &exp_year);
         if (exp_year < 2020 or exp_year > 2030) {
           continue;
         }
@@ -110,8 +132,11 @@ void part_2(const std::vector<std::string>& data) {
       if (field.starts_with("hgt")) {
         int height;
         std::string units(10, '\0');
-        sscanf(contents.c_str(), "%d%2c", &height, units.c_str());
-//        std::cout << "Height is " << height << " with units " << units << "\n";
+//        std::cout << contents << "\n";
+        if(sscanf(contents, "%d%2c", &height, units.c_str()) != 2){
+          continue;
+        }
+        //        std::cout << "Height is " << height << " with units " << units << "\n";
         if (units.starts_with("in")) {
           if (height < 59 or height > 76) {
             continue;
@@ -123,12 +148,66 @@ void part_2(const std::vector<std::string>& data) {
           }
         }
       }
-      
+
+      if (field.starts_with("hcl")) {
+        char color_code[10];
+        if(sscanf(contents, "#%s", color_code) == 0){
+          continue;
+        }
+//        std::cout << "color code: " << color_code << "\n";
+        std::string s(color_code);
+        //        std::cout << s.length() << "\n";
+        if (s.length() != 6) {
+          continue;
+        }
+        //        std::cout << s << "\n";
+        bool invalid = false;
+        for (char c : s) {
+          if (not absl::StrContains("abcdef0123456789", c)) {
+            invalid = true;
+            break;
+          }
+        }
+        if (invalid) {
+          continue;
+        }
+      }
+
+      if (field.starts_with("ecl")) {
+        if (contents_str.length() != 3) {
+          continue;
+        }
+        if (not absl::StrContains("amb blu brn gry grn hzl oth", contents_str)) {
+          continue;
+        }
+      }
+
+      if (field.starts_with("pid")) {
+        if (contents_str.length() != 9) {
+          continue;
+        }
+        //        std::cout << contents_str << "\n";
+        bool invalid = false;
+        for (auto c : contents_str) {
+          if (not absl::StrContains("0123456789", c)) {
+            invalid = true;
+            break;
+          }
+        }
+        if (invalid) {
+          continue;
+        }
+      }
 
       field_count++;
+      valid_fields.insert(field);
     }
     if (field_count == 7) {
       valid_count++;
+      if (valid_fields.size() != 7) {
+        std::cout << "There's our problem\n";
+      }
+//      std::cout << line << "\n";
     }
   }
   std::cout << valid_count << "\n\n\n";
@@ -137,8 +216,9 @@ void part_2(const std::vector<std::string>& data) {
 int main() {
   auto data_str = read_from_file("d4");
   // Comment out for running on real data
-  data_str = tmp_data;
+  //  data_str = tmp_data;
   //  std::cout << data_str << '\n';
+//  data_str = tmp_invalid_data;
   auto data = split(data_str, "\n\n");
 
   part_1(data);
