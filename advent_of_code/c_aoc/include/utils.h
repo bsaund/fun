@@ -2,8 +2,8 @@
 // Created by bsaund on 12/27/20.
 //
 
-#ifndef CPP_PRINTING_H
-#define CPP_PRINTING_H
+#ifndef CPP_UTILS_H
+#define CPP_UTILS_H
 
 #include <string>
 #include <vector>
@@ -24,5 +24,13 @@ void print(const std::vector<T> &v){
 }
 
 
+void check(bool should_be_true, const std::string& msg = ""){
+  if(should_be_true){
+    return;
+  }
+  std::cout << msg << "\n";
+  throw std::logic_error("check failed: " + msg);
+}
 
-#endif  // CPP_PRINTING_H
+
+#endif  // CPP_UTILS_H
