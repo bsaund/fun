@@ -50,9 +50,13 @@ class InteractiveSin(QtWidgets.QTabWidget):
 
     def __init__(self):
         super().__init__()
+        layout = QtWidgets.QGridLayout()
+        title = QtWidgets.QLabel("Here is a graph of a*sin(w*t)", self)
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
         self.plot_canvas = MplCanvas(parent=self, width=5, height=4, dpi=100)
         self.redraw()
-        layout = QtWidgets.QGridLayout()
         layout.addWidget(self.plot_canvas)
 
         self.a_slider = LabeledSlider(name="A", maximum=1.0, minimum=0.0, tickInterval=0.01)
@@ -84,16 +88,21 @@ class InteractiveSin(QtWidgets.QTabWidget):
         self.redraw()
 
 
-class InteractiveLine(QtWidgets.QWidget):
+class InteractiveLine(QtWidgets.QTabWidget):
     m = 1
     b = 0
     plot_ref = None
 
     def __init__(self):
         super().__init__()
+        layout = QtWidgets.QGridLayout()
+
+        title = QtWidgets.QLabel("And here is mx + b", self)
+        title.setAlignment(Qt.AlignCenter)
+        layout.addWidget(title)
+
         self.plot_canvas = MplCanvas(parent=self, width=5, height=4, dpi=100)
         self.redraw()
-        layout = QtWidgets.QGridLayout()
         layout.addWidget(self.plot_canvas)
 
         self.m_slider = LabeledSlider(name="m", maximum=1.0, minimum=0.0, tickInterval=0.01)
@@ -130,8 +139,10 @@ class MainWidget(QtWidgets.QWidget):
         super().__init__()
         layout = QtWidgets.QGridLayout()
         # sc = InteractiveSin()
+
         layout.addWidget(InteractiveSin(), 0, 0)
         layout.addWidget(InteractiveLine(), 1, 0)
+
         self.setLayout(layout)
 
 
