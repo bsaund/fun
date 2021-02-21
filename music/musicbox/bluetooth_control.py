@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+"""
+This is an interface for mopidy using a bluetooth remote controller
+I have it running on a raspberry pi that is connected via bluetooth to a speaker with a remote control
+"""
+
 import evdev
 from mopidy_json_client import MopidyClient
 import time
