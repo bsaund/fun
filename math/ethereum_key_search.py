@@ -20,6 +20,8 @@ interesting_keys = \
         "96e0985b97c889b527e11b27e7330f3cd2b879b1354add756c454aac7524dc141ccac9c1821b7fb214e1561f56db7f2ab93b3eb2ae7713d310c8ec829807e0a0",
     ]
 
+shortened_keys = [k[0:5] for k in interesting_keys]
+
 keccak = sha3.keccak_256()
 
 
@@ -38,7 +40,7 @@ def address_formatted(to_hash_str):
     return '0x' + out
 
 
-def private_to_account(private_key_hex):
+def private_to_public(private_key_hex):
     private_key_hex_nopad = private_key_hex[2:]
     private_key = bytearray.fromhex(private_key_hex_nopad)
     # f = hex(int(private_key_str, base=16))
@@ -68,8 +70,9 @@ def endless_search():
 
 
 def check_key(private_key_hex):
-    public = private_to_account(private_key_hex)
-    if public in interesting_keys:
+    public = private_to_public(private_key_hex)
+    if public[0:5] in shortened_keys
+    # if public in interesting_keys:
         print(f"Found private key! {private_key_hex} that matches {public}")
         with open("./found_keys.txt", 'a') as f:
             f.write(private_key_hex)
