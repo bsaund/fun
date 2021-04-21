@@ -27,7 +27,7 @@ prompt_primer = """Is this fictional character a robot or person?
 
 
 people = """Captain Reynolds
-Rich Sanchez
+Rick Sanchez
 Luke Skywalker
 Lara Croft
 Taravangian
@@ -83,11 +83,13 @@ Talos""".split("\n")
 
 ask_list = [("robot", r) for r in robots] + [("person", p) for p in people]
 # ask_list = [("person", r) for r in robots] + [("robot", p) for p in people]
+
 random.shuffle(ask_list)
 
 
 def ask(imp):
     prompt = prompt_primer + imp + " =>"
+    # print(prompt)
     classification = query_most_likely(prompt, allowed_set, print_probs=False, engine='davinci')
     # print(f'{Fore.GREEN}{imp} is a {Style.RESET_ALL}', end='')
     # print(f'{Fore.MAGENTA}{classification}{Style.RESET_ALL}')
