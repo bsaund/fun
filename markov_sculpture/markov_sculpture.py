@@ -61,7 +61,7 @@ class RingGraph(Graph):
         super().__init__()
 
         angles = np.linspace(0, 2 * np.pi, num=num_nodes + 1)[0:-1]
-        vals = [(np.sin(th), np.cos(th)) for th in angles]
+        vals = [(np.cos(th), np.sin(th)) for th in angles]
 
         if reverse:
             vals.reverse()
@@ -74,13 +74,28 @@ class RingGraph(Graph):
         self.add_edge(self.nodes[-1], self.nodes[0])
 
 
+class ArcGraph(Graph):
+    def __init__(self, center, radius=300, num_nodes=24, start_angle_deg=0, end_angle_deg=0, reverse=False):
+        super().__init__()
+        angles = np.linspace(np.deg2rad(start_angle_deg), np.deg2rad(end_angle_deg), num=num_nodes + 1)
+        vals = [(np.cos(th), np.sin(th)) for th in angles]
+        if reverse:
+            vals.reverse()
+
+        for val in vals:
+            self.add_node(radius * np.array(val) + np.array(center))
+        for n1, n2 in zip(self.nodes, self.nodes[1:]):
+            self.add_edge(n1, n2)
+
+
 class ThreeRingGraph(Graph):
-    def __init__(self, center, radii=200, num_nodes_per_circle=24):
+    def __init__(self, center, radii=200, num_nodes_per_circle=18):
         super().__init__()
         self.make_three_rings(center, radii, num_nodes_per_circle)
 
     def make_three_rings(self, center, radii, num_nodes_per_circle):
 
+        # Circle Centers
         h = -np.sqrt(3) * radii
         offset = -np.tan(np.deg2rad(30)) * radii
         c1 = np.array(center) + np.array([0, h - offset])
@@ -89,28 +104,34 @@ class ThreeRingGraph(Graph):
 
         # for center in [c1, c2, c3]:
         # self.add_ring(center, radii, num_nodes_per_circle)
-        r1 = RingGraph(c1, radii, num_nodes_per_circle)
-        r1_m = RingGraph(c1, radii, num_nodes_per_circle, reverse=True)
-        r2 = RingGraph(c2, radii, num_nodes_per_circle)
-        r2_m = RingGraph(c2, radii, num_nodes_per_circle, reverse=True)
-        r3 = RingGraph(c3, radii, num_nodes_per_circle)
-        r3_m = RingGraph(c3, radii, num_nodes_per_circle, reverse=True)
+        forwards = []
+        mirrors = []
+        for c in [c1, c2, c3]:
+            forwards.append(RingGraph(c, radii, num_nodes_per_circle))
+            mirrors.append(RingGraph(c, radii, num_nodes_per_circle, reverse=True))
 
-        merge_graphs(r1, r2_m)
-        # merge_graphs(r2, r3_m)
-        # merge_graphs(r3, r1_m)
-        merge_graphs(r1, r3_m)
-        # merge_graphs(r2, r1_m)
-        # merge_graphs(r3, r2_m)
+        # Arc Centers
+        c4 = np.array(center) + np.array([-2 * radii, h - offset])
+        c5 = np.array(center) + np.array([2 * radii, h - offset])
+        c6 = np.array(center) + np.array([0, -offset - h])
 
-        for g in [r1, r2_m, r3_m]:
+        forwards.append(ArcGraph(c4, radii, int(num_nodes_per_circle / 6), 0, 60))
+        mirrors.append(ArcGraph(c4, radii, int(num_nodes_per_circle / 6), 0, 60, reverse=True))
+        forwards.append(ArcGraph(c5, radii, int(num_nodes_per_circle / 6), 180-60, 180))
+        mirrors.append(ArcGraph(c5, radii, int(num_nodes_per_circle / 6), 180-60, 180, reverse=True))
+        forwards.append(ArcGraph(c6, radii, int(num_nodes_per_circle / 6), -120, -60))
+        mirrors.append(ArcGraph(c6, radii, int(num_nodes_per_circle / 6), -120, -60, reverse=True))
+
+        c5 = np.array(center) + np.array([-h, h - offset])
+
+        for i, f in enumerate(forwards):
+            for j, r in enumerate(mirrors):
+                if i == j:
+                    continue
+                merge_graphs(f, r)
+
+        for g in forwards + mirrors:
             self.nodes += g.nodes
-
-        # for g in [r1, r2, r3, r1_m, r2_m, r3_m]:
-        #     self.nodes += g.nodes
-
-
-
 
     def add_ring(self, center, radius, num_nodes):
         angles = np.linspace(0, 2 * np.pi, num=num_nodes + 1)[0:-1]
@@ -133,7 +154,7 @@ class Agent:
     def __init__(self):
         self.pos = np.array([0, 0])
         self.cur_node = None
-        self.period = 10
+        self.period = 5
         self.cur_node_count = 0
 
     def update(self, graph: Graph):
@@ -157,7 +178,8 @@ class Agent:
 
 
 class LEDArray:
-    default_color = "#222222"
+    # default_color = "#111111"
+    default_color = "#444444"
     active_color = "red"
 
     def __init__(self, graph: Graph, canvas: tk.Canvas):
@@ -174,7 +196,6 @@ class LEDArray:
                     break
             self.led_handles.append(create_circle(canvas, n, fill=self.default_color))
             self.node_to_led[key_n] = len(self.led_handles) - 1
-
 
         #
         # for n in graph.nodes:
