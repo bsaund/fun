@@ -6,12 +6,12 @@ DEBUG = False
 
 class Params:
     nodes_per_circle = 18
-    common_period_bounds = [10, 50]
+    common_period_bounds = [10, 80]
     common_period_change_rate = 1
     global_update_period_ms = 1000
-    individual_period_factor_bounds = [1.0, 3.0]
+    individual_period_factor_bounds = [1.0, 1.5]
     individual_period_factor_change_rate = 0.001
-
+    decision_resampling_period = 100
 
 
 def create_circle_base(c, x, y, r, **kwargs):
@@ -74,7 +74,8 @@ class Graph:
             return node
         return self.add_node(pos)
 
-    def add_edge(self, n1, n2):
+    @staticmethod
+    def add_edge(n1, n2):
         n1.successors.append(n2)
 
 
@@ -171,11 +172,21 @@ class ThreeRingGraph(Graph):
 
 class BinaryDecision:
     def __init__(self):
-        # self.left_prob = np.random.rand()
+        self.left_prob = 0.5
+        self.sample_decision_probability()
+        self.visit_count = 0
+
+    def sample_decision_probability(self):
         self.left_prob = np.random.choice([0.1, 0.9])
         print(f"Binary decision with prob {self.left_prob}")
 
     def choose(self, choices):
+        self.visit_count += 1
+        p = Params()
+        if self.visit_count > p.decision_resampling_period:
+            self.visit_count = 0
+            self.sample_decision_probability()
+
         if len(choices) != 2:
             raise RuntimeError(f"Binary Decision must have 2 choices. {len(choices)} provided")
 
@@ -285,7 +296,7 @@ class RingSculpture:
     def global_update(self):
         p = Params()
 
-        self.common_period += np.random.randint(-p.common_period_change_rate, 1+p.common_period_change_rate)
+        self.common_period += np.random.randint(-p.common_period_change_rate, 1 + p.common_period_change_rate)
         self.common_period = np.clip(self.common_period, *p.common_period_bounds)
 
         for agent in self.agents:
@@ -310,7 +321,7 @@ class RingSculpture:
             self.label.configure(text=f"{self.seconds:0.3f} s")
         self.canvas.after(1, self.refresh_pane)
 
-    def quit(self, event=None):
+    def quit(self, _event=None):
         print("Calling it quits")
         self.canvas.quit()
         self.canvas.destroy()
