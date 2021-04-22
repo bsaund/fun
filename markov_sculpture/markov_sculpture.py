@@ -4,6 +4,16 @@ import numpy as np
 DEBUG = False
 
 
+class Params:
+    nodes_per_circle = 18
+    common_period_bounds = [10, 50]
+    common_period_change_rate = 1
+    global_update_period_ms = 1000
+    individual_period_factor_bounds = [1.0, 3.0]
+    individual_period_factor_change_rate = 0.001
+
+
+
 def create_circle_base(c, x, y, r, **kwargs):
     return c.create_oval(x - r, y - r, x + r, y + r, **kwargs)
 
@@ -176,10 +186,11 @@ class BinaryDecision:
 
 class Agent:
     def __init__(self):
+        p = Params()
         self.pos = np.array([0, 0])
         self.cur_node = None
         self.common_period = 1
-        self.individual_period = np.random.randint(1, 10)
+        self.individual_period_factor = np.random.uniform(*p.individual_period_factor_bounds)
         self.cur_node_count = 0
         self.node_to_decision = dict()
 
@@ -188,27 +199,11 @@ class Agent:
             self.cur_node = graph.nodes[0]
 
         self.cur_node_count += 1
-        if self.cur_node_count < self.common_period + self.individual_period:
+        if self.cur_node_count < self.common_period * self.individual_period_factor:
             return
 
         self.cur_node_count = 0
         self.cur_node = self.cur_node.sample_successor()
-        # suc = self.cur_node.successors
-        # if len(suc) == 1:
-        #     self.cur_node = suc[0]
-        #     return
-        # if len(suc) == 0:
-        #     raise RuntimeError("Node has no successors")
-        # if len(suc) > 2:
-        #     raise RuntimeError(f"Node has {len(suc)} successors. Only 1 or 2 supported")
-        #
-        # if self.cur_node not in self.node_to_decision:
-        #     self.node_to_decision[self.cur_node] = BinaryDecision()
-        # self.cur_node = self.node_to_decision[self.cur_node].choose(suc)
-
-        # self.cur_node = np.random.choice(suc)
-        # self.cur_node = suc[0]
-        # raise RuntimeError("Undefined behavior for multiple successors")
 
 
 class LEDArray:
@@ -259,8 +254,9 @@ class LEDArray:
 
 class RingSculpture:
     def __init__(self, parent):
-        self.common_period_bounds = [10, 150]
-        self.common_period = np.random.randint(*self.common_period_bounds)
+        p = Params()
+        self.common_period = np.random.randint(*p.common_period_bounds)
+        # self.common_period = np.max(p.common_period_bounds)
 
         self.seconds = 0
         self.canvas = tk.Canvas(parent, width=1000, height=1000, borderwidth=0, highlightthickness=0, bg="black")
@@ -269,7 +265,7 @@ class RingSculpture:
         self.canvas.pack()
 
         # print("making graph")
-        self.graph = ThreeRingGraph(center=(500, 500))
+        self.graph = ThreeRingGraph(center=(500, 500), num_nodes_per_circle=p.nodes_per_circle)
         # print("making led array")
         self.leds = LEDArray(self.graph, self.canvas)
         # print("Making agent")
@@ -287,14 +283,21 @@ class RingSculpture:
         parent.bind('q', self.quit)
 
     def global_update(self):
+        p = Params()
 
-        self.common_period += np.random.randint(-1, 2)
-        self.common_period = np.clip(self.common_period, self.common_period_bounds[0], self.common_period_bounds[1])
+        self.common_period += np.random.randint(-p.common_period_change_rate, 1+p.common_period_change_rate)
+        self.common_period = np.clip(self.common_period, *p.common_period_bounds)
+
+        for agent in self.agents:
+            cr = p.individual_period_factor_change_rate
+            agent.individual_period_factor += np.random.uniform(-cr, cr)
+            agent.individual_period_factor = np.clip(agent.individual_period_factor, *p.individual_period_factor_bounds)
+
         print(f"Global Update. Period {self.common_period}")
 
         for agent in self.agents:
             agent.common_period = self.common_period
-        self.canvas.after(1000, self.global_update)
+        self.canvas.after(p.global_update_period_ms, self.global_update)
 
     def refresh_pane(self):
         for agent in self.agents:
@@ -314,10 +317,6 @@ class RingSculpture:
 
 
 if __name__ == "__main__":
-    # make_sin_graph(root)
-    # make_quit_button()
-    # root = tkinter.Tk()
-    # repeated()
     root = tk.Tk()
     root.wm_title("Testing Tkinter")
     RingSculpture(root)
