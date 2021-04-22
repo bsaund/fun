@@ -94,35 +94,42 @@ class ThreeRingGraph(Graph):
         self.make_three_rings(center, radii, num_nodes_per_circle)
 
     def make_three_rings(self, center, radii, num_nodes_per_circle):
+        forwards = []
+        mirrors = []
+        center = np.array(center)
+
+        def add_cirle_pair(cir_center):
+            forwards.append(RingGraph(cir_center, radii, num_nodes_per_circle))
+            mirrors.append(RingGraph(cir_center, radii, num_nodes_per_circle, reverse=True))
+
+        def add_arc_pair(arc_center, start_deg, end_deg):
+            num_nodes = num_nodes_per_circle * (end_deg - start_deg) / 360
+            if not num_nodes.is_integer():
+                raise RuntimeError(f"Configuration invalid. Trying to build an arc with {num_nodes} nodes")
+            forwards.append(ArcGraph(arc_center, radii, int(num_nodes), start_deg, end_deg))
+            mirrors.append(ArcGraph(arc_center, radii, int(num_nodes), start_deg, end_deg, reverse=True))
 
         # Circle Centers
         h = -np.sqrt(3) * radii
         offset = -np.tan(np.deg2rad(30)) * radii
-        c1 = np.array(center) + np.array([0, h - offset])
-        c2 = np.array(center) + np.array([radii, -offset])
-        c3 = np.array(center) + np.array([-radii, -offset])
+        c1 = center + [0, h - offset]
+        c2 = center + [radii, -offset]
+        c3 = center + [-radii, -offset]
 
-        # for center in [c1, c2, c3]:
-        # self.add_ring(center, radii, num_nodes_per_circle)
-        forwards = []
-        mirrors = []
         for c in [c1, c2, c3]:
-            forwards.append(RingGraph(c, radii, num_nodes_per_circle))
-            mirrors.append(RingGraph(c, radii, num_nodes_per_circle, reverse=True))
+            add_cirle_pair(c)
 
         # Arc Centers
-        c4 = np.array(center) + np.array([-2 * radii, h - offset])
-        c5 = np.array(center) + np.array([2 * radii, h - offset])
-        c6 = np.array(center) + np.array([0, -offset - h])
+        c4 = center + [-2 * radii, h - offset]
+        c5 = center + [2 * radii, h - offset]
+        c6 = center + [0, -offset - h]
 
-        forwards.append(ArcGraph(c4, radii, int(num_nodes_per_circle / 6), 0, 60))
-        mirrors.append(ArcGraph(c4, radii, int(num_nodes_per_circle / 6), 0, 60, reverse=True))
-        forwards.append(ArcGraph(c5, radii, int(num_nodes_per_circle / 6), 180-60, 180))
-        mirrors.append(ArcGraph(c5, radii, int(num_nodes_per_circle / 6), 180-60, 180, reverse=True))
-        forwards.append(ArcGraph(c6, radii, int(num_nodes_per_circle / 6), -120, -60))
-        mirrors.append(ArcGraph(c6, radii, int(num_nodes_per_circle / 6), -120, -60, reverse=True))
+        add_arc_pair(c4, 0, 60)
+        add_arc_pair(c5, 120, 180)
+        add_arc_pair(c6, -120, -60)
 
-        c5 = np.array(center) + np.array([-h, h - offset])
+
+
 
         for i, f in enumerate(forwards):
             for j, r in enumerate(mirrors):
@@ -133,21 +140,6 @@ class ThreeRingGraph(Graph):
         for g in forwards + mirrors:
             self.nodes += g.nodes
 
-    def add_ring(self, center, radius, num_nodes):
-        angles = np.linspace(0, 2 * np.pi, num=num_nodes + 1)[0:-1]
-        vals = [(np.sin(th), np.cos(th)) for th in angles]
-        new_nodes = []
-        for val in vals:
-            pos = radius * np.array(val) + np.array(center)
-            if node := self.get_node(pos):
-                pass
-            else:
-                node = self.add_node(pos)
-
-            new_nodes.append(node)
-        for n1, n2 in zip(new_nodes, new_nodes[1:]):
-            self.add_edge(n1, n2)
-        self.add_edge(new_nodes[-1], new_nodes[0])
 
 
 class Agent:
@@ -178,8 +170,8 @@ class Agent:
 
 
 class LEDArray:
-    # default_color = "#111111"
-    default_color = "#444444"
+    default_color = "#111111"
+    # default_color = "#444444"
     active_color = "red"
 
     def __init__(self, graph: Graph, canvas: tk.Canvas):
@@ -191,28 +183,21 @@ class LEDArray:
         for n in graph.nodes:
             key_n = tuple(n.pos.tolist())
             for k, v in self.node_to_led.items():
-                if np.all(np.array(k) - n.pos <= 0.01):
+                if np.all(np.abs(np.array(k) - n.pos) <= 0.01):
                     self.node_to_led[key_n] = v
                     break
-            self.led_handles.append(create_circle(canvas, n, fill=self.default_color))
-            self.node_to_led[key_n] = len(self.led_handles) - 1
-
-        #
-        # for n in graph.nodes:
-        #     k = n.pos.tolist()
-        #     if k in self.led_handles:
-        #         continue
-        #     self.led_handles[k] = create_circle(canvas, n, fill=self.default_color)
-
-        # {n: create_circle(canvas, n, fill=self.default_color) for n in graph.nodes}
+            if key_n not in self.node_to_led:
+                self.led_handles.append(create_circle(canvas, n, fill=self.default_color))
+                self.node_to_led[key_n] = len(self.led_handles) - 1
 
     def update(self, canvas: tk.Canvas, active_nodes):
         for k, v in self.node_to_led.items():
             if k in [tuple(n.pos.tolist()) for n in active_nodes]:
                 canvas.itemconfig(self.led_handles[v], fill=self.active_color)
+                canvas.itemconfig(self.led_handles[v], state='normal')
             else:
                 canvas.itemconfig(self.led_handles[v], fill=self.default_color)
-
+                # canvas.itemconfig(self.led_handles[v], state='hidden')
 
 class RingSculpture:
     def __init__(self, parent):
