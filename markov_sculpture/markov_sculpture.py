@@ -1,7 +1,7 @@
 import tkinter as tk
-
 import numpy as np
-from collections import defaultdict
+
+DEBUG = False
 
 
 def create_circle_base(c, x, y, r, **kwargs):
@@ -11,7 +11,9 @@ def create_circle_base(c, x, y, r, **kwargs):
 def create_circle(canvas, node, **kwargs):
     return create_circle_base(canvas, node.pos[0], node.pos[1], node.r, **kwargs)
 
+
 node_counter = 0
+
 
 class Node:
     def __init__(self, pos: np.ndarray, radius=5):
@@ -21,6 +23,20 @@ class Node:
         self.successors = []
         self.id = node_counter
         node_counter += 1
+        self.sampler = None
+
+    def sample_successor(self):
+        if len(self.successors) == 1:
+            return self.successors[0]
+        if len(self.successors) == 0:
+            raise RuntimeError("Node has no successors")
+        if len(self.successors) > 2:
+            raise RuntimeError(f"Node has {len(self.successors)} successors. Only 1 or 2 supported")
+
+        if self.sampler is None:
+            self.sampler = BinaryDecision()
+
+        return self.sampler.choose(self.successors)
 
     def __hash__(self):
         return hash(self.id)
@@ -62,7 +78,7 @@ def merge_graphs(g1: Graph, g2: Graph):
 
 
 class RingGraph(Graph):
-    def __init__(self, center, radius=300, num_nodes=24, reverse=False):
+    def __init__(self, center, radius, num_nodes, reverse=False):
         super().__init__()
 
         angles = np.linspace(0, 2 * np.pi, num=num_nodes + 1)[0:-1]
@@ -80,7 +96,7 @@ class RingGraph(Graph):
 
 
 class ArcGraph(Graph):
-    def __init__(self, center, radius=300, num_nodes=24, start_angle_deg=0, end_angle_deg=0, reverse=False):
+    def __init__(self, center, radius, num_nodes, start_angle_deg=0, end_angle_deg=0, reverse=False):
         super().__init__()
         angles = np.linspace(np.deg2rad(start_angle_deg), np.deg2rad(end_angle_deg), num=num_nodes + 1)
         vals = [(np.cos(th), np.sin(th)) for th in angles]
@@ -143,29 +159,54 @@ class ThreeRingGraph(Graph):
             self.nodes += g.nodes
 
 
+class BinaryDecision:
+    def __init__(self):
+        # self.left_prob = np.random.rand()
+        self.left_prob = np.random.choice([0.1, 0.9])
+        print(f"Binary decision with prob {self.left_prob}")
+
+    def choose(self, choices):
+        if len(choices) != 2:
+            raise RuntimeError(f"Binary Decision must have 2 choices. {len(choices)} provided")
+
+        if np.random.rand() < self.left_prob:
+            return choices[0]
+        return choices[1]
+
+
 class Agent:
     def __init__(self):
         self.pos = np.array([0, 0])
         self.cur_node = None
-        self.period = 100
+        self.common_period = 1
+        self.individual_period = np.random.randint(1, 10)
         self.cur_node_count = 0
+        self.node_to_decision = dict()
 
     def update(self, graph: Graph):
         if self.cur_node is None:
             self.cur_node = graph.nodes[0]
 
         self.cur_node_count += 1
-        if self.cur_node_count < self.period:
+        if self.cur_node_count < self.common_period + self.individual_period:
             return
 
         self.cur_node_count = 0
-        suc = self.cur_node.successors
-        if len(suc) == 0:
-            raise RuntimeError("Node has no successors")
-        if len(suc) == 1:
-            self.cur_node = suc[0]
-            return
-        self.cur_node = np.random.choice(suc)
+        self.cur_node = self.cur_node.sample_successor()
+        # suc = self.cur_node.successors
+        # if len(suc) == 1:
+        #     self.cur_node = suc[0]
+        #     return
+        # if len(suc) == 0:
+        #     raise RuntimeError("Node has no successors")
+        # if len(suc) > 2:
+        #     raise RuntimeError(f"Node has {len(suc)} successors. Only 1 or 2 supported")
+        #
+        # if self.cur_node not in self.node_to_decision:
+        #     self.node_to_decision[self.cur_node] = BinaryDecision()
+        # self.cur_node = self.node_to_decision[self.cur_node].choose(suc)
+
+        # self.cur_node = np.random.choice(suc)
         # self.cur_node = suc[0]
         # raise RuntimeError("Undefined behavior for multiple successors")
 
@@ -216,44 +257,60 @@ class LEDArray:
         self.first_pass = False
 
 
-
 class RingSculpture:
     def __init__(self, parent):
+        self.common_period_bounds = [10, 150]
+        self.common_period = np.random.randint(*self.common_period_bounds)
+
         self.seconds = 0
         self.canvas = tk.Canvas(parent, width=1000, height=1000, borderwidth=0, highlightthickness=0, bg="black")
+        parent.attributes("-fullscreen", True)
+        parent["bg"] = "black"
         self.canvas.pack()
 
-        # tk.Canvas.create_circle_arc = _create_circle_arc
-
-        # create_circle(self.canvas, 100, 120, 50, fill="blue", outline="#DDD", width=4)
-        # self.c2 = create_circle(self.canvas, 150, 40, 20, fill="#BBB", outline="")
-
-        print("making graph")
+        # print("making graph")
         self.graph = ThreeRingGraph(center=(500, 500))
-        print("making led array")
+        # print("making led array")
         self.leds = LEDArray(self.graph, self.canvas)
-        print("Making agent")
-        self.agents = [Agent()]
+        # print("Making agent")
+        self.agents = [Agent(), Agent()]
 
         parent.wm_title("Circles and Arcs")
 
-        self.label = tk.Label(parent, text="0 s", font="Arial 30", width=10)
-        self.label.pack()
+        if DEBUG:
+            self.label = tk.Label(parent, text="0 s", font="Arial 30", width=10)
+            self.label.pack()
 
-        self.label.after(10, self.refresh_label)
+        self.canvas.after(10, self.refresh_pane)
+        self.canvas.after(1, self.global_update)
+        parent.bind('<Escape>', self.quit)
+        parent.bind('q', self.quit)
 
-    def refresh_label(self):
-        """ refresh the content of the label every second """
+    def global_update(self):
 
+        self.common_period += np.random.randint(-1, 2)
+        self.common_period = np.clip(self.common_period, self.common_period_bounds[0], self.common_period_bounds[1])
+        print(f"Global Update. Period {self.common_period}")
+
+        for agent in self.agents:
+            agent.common_period = self.common_period
+        self.canvas.after(1000, self.global_update)
+
+    def refresh_pane(self):
         for agent in self.agents:
             agent.update(self.graph)
 
         self.leds.update(self.canvas, active_nodes=[agent.cur_node for agent in self.agents])
 
         self.seconds += 0.001
-        self.label.configure(text=f"{self.seconds:0.3f} s")
-        self.label.after(1, self.refresh_label)
-        # self.graph.update(self.canvas)
+        if DEBUG:
+            self.label.configure(text=f"{self.seconds:0.3f} s")
+        self.canvas.after(1, self.refresh_pane)
+
+    def quit(self, event=None):
+        print("Calling it quits")
+        self.canvas.quit()
+        self.canvas.destroy()
 
 
 if __name__ == "__main__":
