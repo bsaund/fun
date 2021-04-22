@@ -1,4 +1,3 @@
-from __future__ import annotations
 import tkinter as tk
 
 import numpy as np
@@ -12,16 +11,22 @@ def create_circle_base(c, x, y, r, **kwargs):
 def create_circle(canvas, node, **kwargs):
     return create_circle_base(canvas, node.pos[0], node.pos[1], node.r, **kwargs)
 
+node_counter = 0
 
 class Node:
-
     def __init__(self, pos: np.ndarray, radius=5):
+        global node_counter
         self.pos = pos
         self.r = radius
         self.successors = []
+        self.id = node_counter
+        node_counter += 1
 
     def __hash__(self):
-        return hash(tuple(self.pos.tolist()))
+        return hash(self.id)
+
+    def __str__(self):
+        return f"id: {self.id}. pos: {self.pos}."
 
 
 class Graph:
@@ -98,7 +103,7 @@ class ThreeRingGraph(Graph):
         mirrors = []
         center = np.array(center)
 
-        def add_cirle_pair(cir_center):
+        def add_circle_pair(cir_center):
             forwards.append(RingGraph(cir_center, radii, num_nodes_per_circle))
             mirrors.append(RingGraph(cir_center, radii, num_nodes_per_circle, reverse=True))
 
@@ -117,7 +122,7 @@ class ThreeRingGraph(Graph):
         c3 = center + [-radii, -offset]
 
         for c in [c1, c2, c3]:
-            add_cirle_pair(c)
+            add_circle_pair(c)
 
         # Arc Centers
         c4 = center + [-2 * radii, h - offset]
@@ -127,9 +132,6 @@ class ThreeRingGraph(Graph):
         add_arc_pair(c4, 0, 60)
         add_arc_pair(c5, 120, 180)
         add_arc_pair(c6, -120, -60)
-
-
-
 
         for i, f in enumerate(forwards):
             for j, r in enumerate(mirrors):
@@ -141,12 +143,11 @@ class ThreeRingGraph(Graph):
             self.nodes += g.nodes
 
 
-
 class Agent:
     def __init__(self):
         self.pos = np.array([0, 0])
         self.cur_node = None
-        self.period = 5
+        self.period = 100
         self.cur_node_count = 0
 
     def update(self, graph: Graph):
@@ -175,29 +176,46 @@ class LEDArray:
     active_color = "red"
 
     def __init__(self, graph: Graph, canvas: tk.Canvas):
-        # unique_poses = {n.pos for n in graph.nodes}
-
         self.node_to_led = dict()
         self.led_handles = []
+        self.active_leds = []
+        self.first_pass = True
 
         for n in graph.nodes:
-            key_n = tuple(n.pos.tolist())
-            for k, v in self.node_to_led.items():
-                if np.all(np.abs(np.array(k) - n.pos) <= 0.01):
-                    self.node_to_led[key_n] = v
+            for existing_node, led_index in self.node_to_led.items():
+                if np.all(np.abs(existing_node.pos - n.pos) <= 0.01):
+                    self.node_to_led[n] = led_index
                     break
-            if key_n not in self.node_to_led:
+            if n not in self.node_to_led:
                 self.led_handles.append(create_circle(canvas, n, fill=self.default_color))
-                self.node_to_led[key_n] = len(self.led_handles) - 1
+                self.node_to_led[n] = len(self.led_handles) - 1
+        print(f"{len(self.led_handles)} leds create")
 
     def update(self, canvas: tk.Canvas, active_nodes):
-        for k, v in self.node_to_led.items():
-            if k in [tuple(n.pos.tolist()) for n in active_nodes]:
-                canvas.itemconfig(self.led_handles[v], fill=self.active_color)
-                canvas.itemconfig(self.led_handles[v], state='normal')
-            else:
-                canvas.itemconfig(self.led_handles[v], fill=self.default_color)
-                # canvas.itemconfig(self.led_handles[v], state='hidden')
+
+        previously_active_leds = self.active_leds
+        self.active_leds = {self.node_to_led[n] for n in active_nodes}
+
+        if previously_active_leds == self.active_leds:
+            return
+
+        for led_index, led in enumerate(self.led_handles):
+            if led_index in self.active_leds:
+                continue
+            if not self.first_pass and led_index not in previously_active_leds:
+                continue
+
+            canvas.itemconfig(led, fill=self.default_color)
+            # canvas.itemconfig(led, state='hidden')
+
+        for led_index in self.active_leds:
+            led = self.led_handles[led_index]
+            canvas.itemconfig(led, state='normal')
+            canvas.itemconfig(led, fill=self.active_color)
+
+        self.first_pass = False
+
+
 
 class RingSculpture:
     def __init__(self, parent):
@@ -210,8 +228,11 @@ class RingSculpture:
         # create_circle(self.canvas, 100, 120, 50, fill="blue", outline="#DDD", width=4)
         # self.c2 = create_circle(self.canvas, 150, 40, 20, fill="#BBB", outline="")
 
+        print("making graph")
         self.graph = ThreeRingGraph(center=(500, 500))
+        print("making led array")
         self.leds = LEDArray(self.graph, self.canvas)
+        print("Making agent")
         self.agents = [Agent()]
 
         parent.wm_title("Circles and Arcs")
@@ -219,7 +240,7 @@ class RingSculpture:
         self.label = tk.Label(parent, text="0 s", font="Arial 30", width=10)
         self.label.pack()
 
-        self.label.after(1000, self.refresh_label)
+        self.label.after(10, self.refresh_label)
 
     def refresh_label(self):
         """ refresh the content of the label every second """
@@ -229,9 +250,9 @@ class RingSculpture:
 
         self.leds.update(self.canvas, active_nodes=[agent.cur_node for agent in self.agents])
 
-        self.seconds += 0.010
+        self.seconds += 0.001
         self.label.configure(text=f"{self.seconds:0.3f} s")
-        self.label.after(10, self.refresh_label)
+        self.label.after(1, self.refresh_label)
         # self.graph.update(self.canvas)
 
 
