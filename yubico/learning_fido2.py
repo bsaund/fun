@@ -39,6 +39,8 @@ from fido2.server import Fido2Server
 from getpass import getpass
 import sys
 import ctypes
+import pickle
+from pathlib import Path
 
 try:
     from fido2.pcsc import CtapPcscDevice
@@ -58,88 +60,117 @@ use_prompt = False
 pin = None
 uv = "discouraged"
 
-if WindowsClient.is_available() and not ctypes.windll.shell32.IsUserAnAdmin():
-    # Use the Windows WebAuthn API if available, and we're not running as admin
-    client = WindowsClient("https://example.com")
-else:
-    # Locate a device
-    for dev in enumerate_devices():
-        client = Fido2Client(dev, "https://example.com")
-        if client.info.options.get("rk"):
-            use_prompt = not (CtapPcscDevice and isinstance(dev, CtapPcscDevice))
-            break
+
+def load_credentials():
+    if not Path("credentials.pkl").exists():
+        return []
+    return pickle.load(open("credentials.pkl", "rb"))
+
+
+def dump_credentials(credentials):
+    pickle.dump(credentials, open("credentials.pkl", "wb"))
+
+
+def get_client():
+    global use_prompt
+    if WindowsClient.is_available() and not ctypes.windll.shell32.IsUserAnAdmin():
+        # Use the Windows WebAuthn API if available, and we're not running as admin
+        client = WindowsClient("https://example.com")
     else:
-        print("No Authenticator with support for resident key found!")
-        sys.exit(1)
+        # Locate a device
+        for dev in enumerate_devices():
+            client = Fido2Client(dev, "https://example.com")
+            if client.info.options.get("rk"):
+                use_prompt = not (CtapPcscDevice and isinstance(dev, CtapPcscDevice))
+                break
+        else:
+            print("No Authenticator with support for resident key found!")
+            sys.exit(1)
 
-    # Prefer UV if supported
-    if client.info.options.get("uv"):
-        uv = "preferred"
-        print("Authenticator supports User Verification")
-    elif client.info.options.get("clientPin"):
-        # Prompt for PIN if needed
-        pin = getpass("Please enter PIN: ")
-    else:
-        print("PIN not set, won't use")
-
-
-server = Fido2Server({"id": "example.com", "name": "Example RP"}, attestation="direct")
-
-user = {"id": b"user_id", "name": "A. User"}
-
-# Prepare parameters for makeCredential
-create_options, state = server.register_begin(
-    user,
-    resident_key=True,
-    user_verification=uv,
-    authenticator_attachment="cross-platform",
-)
-
-# Create a credential
-if use_prompt:
-    print("\nTouch your authenticator device now...\n")
-
-result = client.make_credential(create_options["publicKey"], pin=pin)
+        # Prefer UV if supported
+        if client.info.options.get("uv"):
+            uv = "preferred"
+            print("Authenticator supports User Verification")
+        elif client.info.options.get("clientPin"):
+            # Prompt for PIN if needed
+            pin = getpass("Please enter PIN: ")
+        else:
+            print("PIN not set, won't use")
+    return client
 
 
-# Complete registration
-auth_data = server.register_complete(
-    state, result.client_data, result.attestation_object
-)
-credentials = [auth_data.credential_data]
+def add_credentials(server, client):
+    user = {"id": b"user_id", "name": "A. User"}
 
-print("New credential created!")
+    # Prepare parameters for makeCredential
+    create_options, state = server.register_begin(
+        user,
+        resident_key=True,
+        user_verification=uv,
+        authenticator_attachment="cross-platform",
+    )
 
-print("CLIENT DATA:", result.client_data)
-print("ATTESTATION OBJECT:", result.attestation_object)
-print()
-# print("CREDENTIAL DATA:", auth_data.credential_data)
+    # Create a credential
+    if use_prompt:
+        print("\nTouch your authenticator device now...\n")
+
+    result = client.make_credential(create_options["publicKey"], pin=pin)
+
+    # Complete registration
+    auth_data = server.register_complete(
+        state, result.client_data, result.attestation_object
+    )
+    credentials = load_credentials()
+    if auth_data.credential_data not in credentials:
+        credentials.append(auth_data.credential_data)
+        dump_credentials(credentials)
+
+    print("New credential created!")
+
+    print("CLIENT DATA:", result.client_data)
+    print("ATTESTATION OBJECT:", result.attestation_object)
+    print()
+    print("CREDENTIAL DATA:", auth_data.credential_data)
+    return credentials
 
 
-# Prepare parameters for getAssertion
-request_options, state = server.authenticate_begin(user_verification=uv)
+def authenticate_device(server, client):
+    # Prepare parameters for getAssertion
+    request_options, state = server.authenticate_begin(user_verification=uv)
 
-# Authenticate the credential
-if use_prompt:
-    print("\nTouch your authenticator device again...\n")
+    # Authenticate the credential
+    if use_prompt:
+        print("\nTouch your authenticator device again...\n")
 
-selection = client.get_assertion(request_options["publicKey"], pin=pin)
-result = selection.get_response(0)  # There may be multiple responses, get the first.
+    selection = client.get_assertion(request_options["publicKey"], pin=pin)
+    result = selection.get_response(0)  # There may be multiple responses, get the first.
 
-print("USER ID:", result.user_handle)
+    print("USER ID:", result.user_handle)
 
-# Complete authenticator
-server.authenticate_complete(
-    state,
-    credentials,
-    result.credential_id,
-    result.client_data,
-    result.authenticator_data,
-    result.signature,
-)
+    credentials = load_credentials()
+    # Complete authenticator
+    server.authenticate_complete(
+        state,
+        credentials,
+        result.credential_id,
+        result.client_data,
+        result.authenticator_data,
+        result.signature,
+    )
 
-print("Credential authenticated!")
+    print("Credential authenticated!")
 
-print("CLIENT DATA:", result.client_data)
-print()
-print("AUTHENTICATOR DATA:", result.authenticator_data)
+    print("CLIENT DATA:", result.client_data)
+    print()
+    print("AUTHENTICATOR DATA:", result.authenticator_data)
+
+
+def main():
+    server = Fido2Server({"id": "example.com", "name": "Example RP"}, attestation="direct")
+    client = get_client()
+    # add_credentials(server, client)
+    authenticate_device(server, client)
+
+
+if __name__ == "__main__":
+    main()
