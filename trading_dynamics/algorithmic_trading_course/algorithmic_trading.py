@@ -3,6 +3,7 @@ import pandas as pd
 import requests
 import xlsxwriter
 import math
+import timeit
 
 from secrets import IEX_CLOUD_API_TOKEN
 
@@ -27,22 +28,65 @@ def get_stock(symbol):
     return data.json()
 
 
+def get_batch_of_100_stock(symbols):
+    if len(symbols) > 100:
+        raise RuntimeError("Cannot query more than 100 stocks at a time")
+    symbols_string = ','.join(symbols)
+    api_url = f'{get_base_api_url()}/stable/stock/market/batch?symbols={symbols_string}&types=quote&token={IEX_CLOUD_API_TOKEN}'
+    data = requests.get(api_url)
+    if data.status_code != 200:
+        raise RuntimeError(f"Error, api request returned {data.status_code} for request{api_url}")
+    return data.json()
+
+def get_stocks(symbols):
+    d = dict()
+    for group in chunks(symbols, 100):
+        d.update(get_batch_of_100_stock(group))
+    return d
+
+
+def chunks(lst, n):
+    for i in range(0, len(lst), n):
+        yield lst[i:i + n]
+
+
 def build_dataframe():
+
     columns = ['Ticker', 'Stock Price', 'Market Cap', 'Number of Shares to Buy']
     df = pd.DataFrame(columns=columns)
+    print('query url')
+    stocks = get_stocks(list(load_sp500()['Ticker']))
+    print('load up df')
+    for tkr, data in stocks.items():
+        # print(f'Getting {tkr}')
+        quote = data['quote']
+        df = df.append(
+            pd.Series([
+                tkr, quote['latestPrice'], quote['marketCap'], 'N/A'
+            ], index=columns),
+            ignore_index=True
+        )
+    print('printing')
+
     print(df)
 
-def repeated_get():
-    prices = [get_stock('AAPL')['latestPrice'] for _ in range(100)]
-    print(np.mean(prices))
+
+
+def wip_batch():
+    # batches = chunks(load_sp500()['Ticker'], 10)
+    # get_batch_stock(list(next(batches)))
+    data = get_stocks(list(load_sp500()['Ticker']))
+    print(len(data.keys()))
 
 
 def main():
-    stock = get_stock('AAPL')
-    print(stock['latestPrice'])
+    # stock = get_stock('AAPL')
+    # print(stock['latestPrice'])
+    build_dataframe()
 
 
 if __name__ == "__main__":
-    load_sp500()
-    main()
-    repeated_get()
+    wip_batch()
+    # load_sp500()
+    # main()
+    # print(f'total time: {timeit.timeit(main)}')
