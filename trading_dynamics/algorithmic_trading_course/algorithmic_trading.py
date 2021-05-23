@@ -3,8 +3,9 @@ import pandas as pd
 import requests
 import xlsxwriter
 import math
-from scipy import stats
+import scipy.stats
 import timeit
+from statistics import mean
 
 from secrets import IEX_CLOUD_API_TOKEN
 
@@ -85,18 +86,49 @@ def build_dataframe():
 def build_stats_dataframe():
     print("Building stats dataframe")
     stocks = get_stocks(list(load_sp500()['Ticker']), types=('stats', 'price'))
-    columns = ['Ticker', 'Stock Price', 'One-Year Price Return', 'Number of Shares to Buy']
+    columns = ['Ticker', 'Stock Price', 'Number of Shares to Buy',
+               'One-Year Price Return', 'One-Year Return Percentile',
+               'Six-Month Price Return', 'Six-Month Return Percentile',
+               'Three-Month Price Return', 'Three-Month Return Percentile',
+               'One-Month Price Return', 'One-Month Return Percentile',
+               'HQM Score']
     df = pd.DataFrame(columns=columns)
     for tkr, data in stocks.items():
         stats = data['stats']
         df = df.append(
             pd.Series([
-                tkr, data['price'], stats['year1ChangePercent'], 'N/A'
+                tkr, data['price'], 'N/A',
+                stats['year1ChangePercent'], 'N/A',
+                stats['month6ChangePercent'], 'N/A',
+                stats['month3ChangePercent'], 'N/A',
+                stats['month1ChangePercent'], 'N/A',
+                'N/A',
             ], index=columns),
             ignore_index=True
         )
 
+    for row in df.index:
+        for time_period in ['One-Year', 'Six-Month', 'Three-Month', 'One-Month']:
+            pc = f'{time_period} Return Percentile'
+            pr = f'{time_period} Price Return'
+            if df.loc[row, pr] == None:
+                continue
+            df.loc[row, pc] = scipy.stats.percentileofscore(df[pr].dropna(), df.loc[row, pr])
+
     df.sort_values('One-Year Price Return', ascending=False, inplace=True)
+    return df
+
+
+def add_momentum(df):
+    for row in df.index:
+        momentum_percentiles = []
+        for time_period in ['One-Year', 'Six-Month', 'Three-Month', 'One-Month']:
+            pf = f'{time_period} Return Percentile'
+            momentum_percentiles.append(df.loc[row, pf])
+        try:
+            df.loc[row, 'HQM Score'] = mean(momentum_percentiles)
+        except TypeError as e:
+            print(f'{df.loc[row, "Ticker"]} HQM can not be calculated')
     return df
 
 
@@ -125,7 +157,9 @@ def main():
 def wip():
     # data = get_stocks(list(load_sp500()['Ticker']), types=('stats',))
     df = build_stats_dataframe()
-    df = fill_with_even_allocation(df, 1_000_000)
+    df = add_momentum(df)
+    df = fill_with_even_allocation(df[0:50].reset_index(), 1_000_000)
+    # print(df[['index', 'Ticker', 'One-Year Price Return']])
     print(df)
 
 
