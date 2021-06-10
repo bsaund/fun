@@ -1,0 +1,8 @@
+// The Round Table
+digraph {
+	brad [label=Brad pos="1,2!"]
+	katie [label=Katie pos="2,2.5!"]
+	kevdog [label=Kevin pose="0,0!"]
+	brad -> kevdog [constraint=false]
+	katie -> kevdog [constraint=false]
+}
