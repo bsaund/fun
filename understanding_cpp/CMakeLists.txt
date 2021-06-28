@@ -7,4 +7,5 @@ add_executable(understanding_cpp src/main.cpp)
 add_executable(vector_polymorphism src/vector_polymorphism.cpp)
 add_executable(reference_wrapper  src/reference_wrapper.cpp)
 add_executable(lambdas  src/lambdas.cpp)
+add_executable(default_operators  src/default_operators.cpp)
 
