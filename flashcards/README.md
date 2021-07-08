@@ -8,4 +8,8 @@ This is a work in progress memory aid app. The goal is to be able to quickly ent
 - add editing interface
 - add easy interface for adding images
 - sync with a google drive csv file, for easy spreadsheet entering interface
+  - downloader (Done)
+  - uploader (Only uploads if no file found)
+  - Automate/give instructions for how to get credentials
+  - Sync with drive when I launch flashcards, and when I add new flashcards
 - Add ability to subselect based on topic
