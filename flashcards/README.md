@@ -4,11 +4,8 @@ This is a work in progress memory aid app. The goal is to be able to quickly ent
 
 
 # TODOs
-- display flashcard question/answers
 - display images
 - add editing interface
 - add easy interface for adding images
-- default to entry screen when no database is present
 - sync with a google drive csv file, for easy spreadsheet entering interface
-- Add "next flashcard" button
 - Add ability to subselect based on topic
