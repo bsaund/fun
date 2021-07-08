@@ -15,6 +15,24 @@ SCOPES = ['https://www.googleapis.com/auth/drive.file']
 flashcards_filename = 'flashcards.csv'
 
 
+class GoogleDriveSyncer:
+    def __init__(self):
+        self.creds = get_creds()
+        self.service = build('drive', 'v3', credentials=self.creds)
+
+    def sync_from_drive(self):
+        files = get_flashcards_files_on_drive(self.service)
+        if len(files) > 1:
+            raise RuntimeError("Multiple flashcard files found. Not sure what to do.")
+        if len(files) == 0:
+            print("Unable to sync from drive: No files found")
+            return
+        sync_from_drive(files[0], self.service)
+
+    def sync_to_drive(self):
+        upload_flashcards(self.service)
+
+
 def get_creds():
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is
@@ -44,11 +62,26 @@ def get_flashcards_files_on_drive(service):
 
 
 def upload_flashcards(service):
+    existing_flashcards = get_flashcards_files_on_drive(service)
+
     file_metadata = {'name': 'Flashcards', 'mimeType': 'application/vnd.google-apps.spreadsheet'}
     media = MediaFileUpload(flashcards_filename, mimetype='text/csv', resumable=True)
-    file = service.files().create(body=file_metadata,
-                                  media_body=media,
-                                  fields='id').execute()
+
+    if len(existing_flashcards) > 1:
+        raise RuntimeError("More than 1 Flashcard file on drive. Unsure what to do")
+
+    if len(existing_flashcards) == 0:
+        print("Uploading new flashcards")
+        file = service.files().create(body=file_metadata,
+                                      media_body=media,
+                                      fields='id').execute()
+    else:
+        print("Updating existing flashcards")
+        file = service.files().update(fileId=existing_flashcards[0]['id'],
+                                      body=file_metadata,
+                                      media_body=media,
+                                      fields='id').execute()
+
     print(f"Uploaded File id {file.get('id')}")
 
 
@@ -79,13 +112,13 @@ def main():
     if len(files) > 1:
         raise RuntimeError("Multiple flashcard files found. Not sure what to do.")
 
-    if not files:
-        print("No Flashcard files found on drive. Uploading...", end='')
-        upload_flashcards(service)
-        print("Done")
 
-    else:
-        sync_from_drive(files[0], service)
+    print("Uploading...", end='')
+    upload_flashcards(service)
+    print("Done")
+
+
+    sync_from_drive(files[0], service)
 
     # # Call the Drive v3 API
     # results = service.files().list(

@@ -7,6 +7,7 @@ from pathlib import Path
 import csv
 from typing import List, Optional
 from colorama import Fore
+import google_drive_sync
 
 bg_color = 'black'
 
@@ -62,12 +63,16 @@ class Flashcards:
 
 
 class FlashcardDisplay:
-    def __init__(self, parent, flashcards):
+    def __init__(self, parent):
         self.flashcard_canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
         self.add_item_canvas = tk.Canvas(parent, borderwidth=0, highlightthickness=0)
         self.entry_panel = None
         self.flashcard_panel = None
-        self.flashcards = flashcards
+
+        self.gcd_sync = google_drive_sync.GoogleDriveSyncer()
+        self.gcd_sync.sync_from_drive()
+
+        self.flashcards = Flashcards()
         parent.attributes("-fullscreen", True)
         # parent["bg"] = bg_color
         # self.canvas.pack()
@@ -81,6 +86,7 @@ class FlashcardDisplay:
         self.make_main_panel_canvas()
         self.make_add_new_item_canvas()
         self.add_item_canvas.grid_remove()
+
 
         if len(self.flashcards.cards) == 0:
             self.switch_to_new_item_canvas()
@@ -116,6 +122,7 @@ class FlashcardDisplay:
         fc = Flashcard(**entry)
         self.flashcards.cards.append(fc)
         self.flashcards.write_flashcards()
+        self.gcd_sync.sync_to_drive()
 
         if self.entry_panel.header is not None:
             self.entry_panel.header.grid_forget()
@@ -209,7 +216,7 @@ class EntryPanel:
         l1.config(font=(None, size))
         self.short_name_entry = tk.Entry(entry_canvas, width=30, font=(None, size))
         l1.grid(row=0, column=0)
-        self.short_name_entry.grid(row=0, column=1)
+        self.short_name_entry.grid(row=0, column=1, padx=10, pady=10)
 
         ltopic = tk.Label(entry_canvas, text="topic", font=(None, size))
         ltopic.grid(row=1, column=0)
@@ -274,5 +281,5 @@ if __name__ == "__main__":
     root.style = ttk.Style()
     root.style.theme_use("clam")
     root.wm_title = ("Flashcards")
-    FlashcardDisplay(root, Flashcards())
+    FlashcardDisplay(root)
     root.mainloop()
