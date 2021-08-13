@@ -1,3 +1,5 @@
+#! /usr/bin/env python
+
 from dataclasses import dataclass
 from enum import Enum
 import tkinter as tk
