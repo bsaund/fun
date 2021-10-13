@@ -26,6 +26,7 @@ void part_1(const std::vector<std::string>& data) {
 
   for (const auto& line : data) {
     sscanf(line.c_str(), "");
+    std::cout << line << "\n";
   }
 }
 
