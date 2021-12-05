@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.19)
+project(advent_of_code_2021)
+
+set(CMAKE_CXX_STANDARD 17)
+
+add_executable(template template.cpp)
+add_executable(d1 d1.cpp)
+add_executable(d2 d2.cpp)
+add_executable(d3 d3.cpp)
+add_executable(d4 d4.cpp)
