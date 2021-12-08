@@ -1,6 +1,10 @@
 #include <fstream>
 #include <iostream>
 #include <vector>
+#include <map>
+#include <set>
+#include <sstream>
+#include <algorithm>
 
 //#include "absl/strings/match.h"
 //#include "include/container_conversions.h"
@@ -20,6 +24,13 @@ std::string tmp_data =
 void part_1(const std::vector<std::string>& data) {
     std::cout << "--------- PART 1 -----------\n";
     // Part 1
+
+//    std::stringstream ss(data[0]);
+//    std::string str;
+//    while(getline(ss, str, ',')){
+//        std::cout << stoi(str) << ", ";
+//    }
+//    std::cout << "\n";
 
     for (const auto& line : data) {
         sscanf(line.c_str(), "");
