@@ -3,6 +3,7 @@
 #include <vector>
 #include <map>
 #include <set>
+#include <unordered_set>
 #include <sstream>
 #include <algorithm>
 
@@ -47,7 +48,7 @@ void part_2(const std::vector<std::string>& data) {
 int main() {
 //    auto data_str = read_from_file("d1");
     // Comment out for running on real data
-//    data_str = tmp_data;
+    data_str = tmp_data;
     auto data = split(data_str, "\n");
 
     part_1(data);
