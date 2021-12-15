@@ -9,4 +9,5 @@ add_executable(reference_wrapper  src/reference_wrapper.cpp)
 add_executable(lambdas  src/lambdas.cpp)
 add_executable(default_operators  src/default_operators.cpp src/strings.cpp)
 add_executable(compare_strings  src/strings.cpp)
+add_executable(list src/list.cpp)
 
