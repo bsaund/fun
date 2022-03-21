@@ -8,6 +8,7 @@ time.sleep(0.5)
 sz = pg.size()
 
 print(pg.position())
+print(pg.getInfo())
 pg.moveTo(sz.width/2, sz.height/2, duration=0.2)
 pg.dragRel(100, 0, duration=0.2)
 # pg.scroll(200)
