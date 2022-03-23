@@ -59,7 +59,7 @@ class MouseRecorder:
                 on_release=self.on_release) as listener:
             listener.join()
 
-        with open("test_commands.pkl", "wb") as file:
+        with open("tmp_commands.pkl", "wb") as file:
             pickle.dump(self.commands, file)
 
 

@@ -42,5 +42,6 @@ class MouseReplayer:
 
 
 
-
-MouseReplayer()
+for _ in range(500):
+    MouseReplayer()
+    time.sleep(10)
