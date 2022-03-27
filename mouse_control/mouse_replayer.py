@@ -1,10 +1,11 @@
 import time
 import pynput
 import pickle
+import random
 
 class MouseReplayer:
-    def __init__(self):
-        with open("test_commands.pkl", "rb") as file:
+    def __init__(self, mouse_file: str):
+        with open(mouse_file, "rb") as file:
             self.commands = pickle.load(file)
 
         self.mouse_controller = pynput.mouse.Controller()
@@ -42,6 +43,9 @@ class MouseReplayer:
 
 
 
-for _ in range(500):
-    MouseReplayer()
-    time.sleep(10)
+for i in range(10):
+    MouseReplayer("om_entry.pkl")
+    sleeptime = 60 + random.random() * 20
+    print(f"Sleeping for {sleeptime} seconds on loop {i}")
+    time.sleep(sleeptime)
+print("Finished")
