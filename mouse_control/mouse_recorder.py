@@ -77,5 +77,6 @@ class MouseRecorder:
 #     on_scroll=on_scroll)
 # listener.start()
 
-mr = MouseRecorder()
-mr.start()
+if __name__ == "__main__":
+    mr = MouseRecorder()
+    mr.start()

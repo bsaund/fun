@@ -1,12 +1,10 @@
 import time
 import pynput
 import pickle
-import random
 import os
 import signal
 from tqdm import tqdm
 import sys
-from utils.timers import countdown
 
 
 class MouseReplayer:
@@ -59,36 +57,3 @@ class MouseReplayer:
             except TypeError as e:
                 print(cmd)
                 raise e
-
-
-class ExitCommand(Exception):
-    pass
-
-
-def signal_handler(signal, frame):
-    raise ExitCommand()
-
-
-class Runner:
-    def __init__(self):
-        signal.signal(signal.SIGUSR1, signal_handler)
-
-    def run(self):
-        try:
-            self.run_loop()
-        except ExitCommand:
-            print("Exiting from user input")
-        finally:
-            print("Finished")
-
-    def run_loop(self):
-        for i in range(10):
-            print(f"Iteration {i + 1}\n======================")
-            MouseReplayer("om_entry.pkl")
-            sleeptime = 60 + random.random() * 20
-            # print(f"Sleeping for {sleeptime} seconds on loop {i}")
-            countdown(sleeptime)
-
-
-if __name__ == "__main__":
-    Runner().run()
