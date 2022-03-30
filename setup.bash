@@ -1,0 +1,3 @@
+
+export PROJ_DIR=`pwd`
+export PYTHONPATH=${PROJ_DIR}:${PYTHONPATH}

@@ -13,3 +13,4 @@ def countdown(time_sec):
 
         sys.stdout.write('\r')
         sys.stdout.flush()
+    print()
