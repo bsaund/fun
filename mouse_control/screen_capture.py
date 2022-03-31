@@ -54,6 +54,35 @@ class ScreenCapture:
 
 class ScreenVerify:
     def __init__(self, fn):
+        with open(fn, "rb") as f:
+            self.data = pickle.load(f)
+
+
+    def matches(self):
+        img = pyautogui.screenshot()
+        img = img.crop(self.data['upper_left'] + self.data['lower_right'])
+
+        if img == self.data['image']:
+            print("Matches")
+        else:
+            print("does not match")
+
+def screen_matches(fn):
+    with open(fn, "rb") as f:
+        data = pickle.load(f)
+    img = pyautogui.screenshot()
+    img = img.crop(data['upper_left'] + data['lower_right'])
+
+    if img == data['image']:
+        print("Matches")
+        return True
+    else:
+        print("does not match")
+        return False
+
 
 if __name__ == "__main__":
-    ScreenCapture()
+    # ScreenCapture()
+    # ScreenVerify("screen_captures/capture_2022_03_30-21_00_46.pkl").matches()
+    fn = "saved_screen_captures/expected_entry_screen.pkl"
+    screen_matches(fn)
