@@ -2,6 +2,7 @@
 import time
 import pynput
 import pickle
+from utils.timestamp import timestamp
 
 
 class MouseRecorder:
@@ -59,8 +60,10 @@ class MouseRecorder:
                 on_release=self.on_release) as listener:
             listener.join()
 
-        with open("tmp_commands.pkl", "wb") as file:
+        filename = f"mouse_movements/mouse_{timestamp()}.pkl"
+        with open(filename, "wb") as file:
             pickle.dump(self.commands, file)
+        print(f"Wrote {filename}")
 
 
 # Collect events until released

@@ -35,16 +35,13 @@ class ScreenCapture:
                    "lower_right": self.lower_right}
             pickle.dump(obj, f)
 
-
         print(f"Saved image as {fn}")
 
-
     def set_upper_left(self, x, y, button, pressed):
-        if pressed==False:
+        if pressed == False:
             return True
         self.upper_left = (x, y)
         return False
-
 
     def set_lower_right(self, x, y, button, pressed):
         if pressed == False:
@@ -52,11 +49,11 @@ class ScreenCapture:
         self.lower_right = (x, y)
         return False
 
+
 class ScreenVerify:
     def __init__(self, fn):
         with open(fn, "rb") as f:
             self.data = pickle.load(f)
-
 
     def matches(self):
         img = pyautogui.screenshot()
@@ -67,6 +64,11 @@ class ScreenVerify:
         else:
             print("does not match")
 
+
+class ScreenDoesNotMatchException(Exception):
+    pass
+
+
 def screen_matches(fn):
     with open(fn, "rb") as f:
         data = pickle.load(f)
@@ -74,15 +76,21 @@ def screen_matches(fn):
     img = img.crop(data['upper_left'] + data['lower_right'])
 
     if img == data['image']:
-        print("Matches")
+        # print("Matches")
         return True
     else:
-        print("does not match")
+        # print("does not match")
         return False
 
 
+def verify_screen_matches(fn):
+    if not screen_matches(fn):
+        print(f"Screen does not match for {fn}")
+        raise ScreenDoesNotMatchException()
+
+
 if __name__ == "__main__":
-    # ScreenCapture()
+    ScreenCapture()
     # ScreenVerify("screen_captures/capture_2022_03_30-21_00_46.pkl").matches()
-    fn = "saved_screen_captures/expected_entry_screen.pkl"
-    screen_matches(fn)
+    # fn = "saved_screen_captures/expected_entry_screen.pkl"
+    # screen_matches(fn)
