@@ -67,7 +67,7 @@ class OMRunner:
 
         ans = check(full_filenames)
         while ans < 0:
-            if time.time() - now > 30:
+            if time.time() - now > 60:
                 raise ScreenDoesNotMatchException()
             time.sleep(0.5)
             ans = check(full_filenames)
@@ -98,12 +98,13 @@ class OMRunner:
         raise LogicError()
 
     def run_once(self):
-        MouseReplayer("saved_mouse_movements/first_click.pkl")
+        MouseReplayer("saved_mouse_movements/full.pkl")
+        # MouseReplayer("saved_mouse_movements/first_click.pkl")
         # verify_screen_matches("saved_screen_captures/Happy_Info_Entry_Screen.pkl")
-        self.wait_and_verify("Happy_Info_Entry_Screen.pkl")
-        MouseReplayer("saved_mouse_movements/enter_name.pkl")
+        # self.wait_and_verify("Happy_Info_Entry_Screennfo_Entry_Screen.pkl")
+        # MouseReplayer("saved_mouse_movements/enter_name.pkl")
         # verify_screen_matches("saved_screen_captures/Happy_reCAPTCHA_solved.pkl")
-        self.check_recaptcha()
+        # self.check_recaptcha()
         # self.wait_and_verify("Happy_reCAPTCHA_solved.pkl")
 
 
