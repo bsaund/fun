@@ -14,7 +14,11 @@ def gen_filepath(speech):
 
 class LetterReader:
     def __init__(self):
-        self.polly = boto3.Session(profile_name="adminuser").client("polly")
+        try:
+            self.polly = boto3.Session(profile_name="adminuser").client("polly")
+        except:
+            self.polly = None
+            print("Warning - unable to connect to AWS. Unable to get new letters")
 
         self.keyboard_listener = pynput.keyboard.Listener(on_press=self.on_press)
         self.keyboard_listener.start()
@@ -31,8 +35,10 @@ class LetterReader:
         self.letter_to_speak = key
         print(f"set letter to speak as {key}")
 
-
     def generate_new_mp3(self, speech):
+        if self.polly is None:
+            return
+
         print(f"Generating new mp3 for {speech}")
         try:
             response = self.polly.synthesize_speech(Text=speech, OutputFormat="mp3", VoiceId="Matthew")
@@ -63,14 +69,6 @@ class LetterReader:
             self.generate_new_mp3(key.char)
 
         subprocess.Popen(['mpg123', '-q', gen_filepath(key.char)]).wait()
-
-
-
-
-
-
-
-
 
 
 if __name__ == "__main__":
