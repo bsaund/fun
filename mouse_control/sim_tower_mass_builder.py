@@ -6,11 +6,16 @@ import signal
 from tqdm import tqdm
 import sys
 
-SINGLE_ROOM = -32
+
+SINGLE_TILE_WIDTH = 8
+SINGLE_ROOM = 4
+CONDO_WIDTH = 16
 ONE_FLOOR_HEIGHT = -36
 
 DY = ONE_FLOOR_HEIGHT
+# DX = CONDO_WIDTH
 DX = SINGLE_ROOM
+DX *= -SINGLE_TILE_WIDTH
 
 class MouseReplayer:
     def __init__(self):
@@ -18,6 +23,7 @@ class MouseReplayer:
             on_press=self.on_press)
         self.keyboard_listener.start()
         self.mouse_controller = pynput.mouse.Controller()
+        self.mouse_file = "saved_mouse_movements/set_sim_tower_elevator.pkl"
         # print(self.commands)
         # self.replay_commands(selfelf.commands)
     def join(self):
@@ -35,6 +41,10 @@ class MouseReplayer:
             self.run_clicking_leftwards()
         if key.char == "b":
             self.run_clicking_both()
+        if key.char == "e":
+            with open(self.mouse_file, "rb") as file:
+                commands = pickle.load(file)
+            self.replay_commands(commands, speed_ratio=2.0)
 
     def move(self, x, y):
         # print(f"Moving to: {x}, {y}")
@@ -47,7 +57,9 @@ class MouseReplayer:
             self.mouse_controller.release(button)
 
     def run_clicking_upwards(self):
-        x, y = self.mouse_controller.position
+        x_init, y_init = self.mouse_controller.position
+        x = x_init
+        y = y_init
         print(f"Current mouse position is {x}, {y}")
         for i in range(4):
             self.click(x, y, button=pynput.mouse.Button.left, press=True)
@@ -55,6 +67,7 @@ class MouseReplayer:
             y += DY
             self.move(x, y)
             time.sleep(0.2)
+        self.move(x_init + DX, y_init)
 
     def run_clicking_leftwards(self):
         x, y = self.mouse_controller.position
@@ -92,11 +105,11 @@ class MouseReplayer:
                    "click": self.click}
         cmd_map[cmd](*command[1:])
 
-    def replay_commands(self, commands):
+    def replay_commands(self, commands, speed_ratio=1.0):
         start_time = time.time()
         for cmd in commands:
             elapsed_time = time.time() - start_time
-            dt = cmd[0] - elapsed_time
+            dt = cmd[0] - elapsed_time * speed_ratio
             if dt > 0:
                 time.sleep(dt)
             try:
