@@ -1,12 +1,10 @@
 import pynput
 import os
 import signal
-import time
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from contextlib import closing
 import subprocess
-from threading import Lock
 
 
 HELP_STR = '''
