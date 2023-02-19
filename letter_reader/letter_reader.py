@@ -39,7 +39,6 @@ class LetterReader:
         try:
             self.polly = boto3.Session(profile_name="adminuser").client("polly")
         except:
-            self.polly = None
             print("Warning - unable to connect to AWS. Unable to get new letters")
 
         self.keyboard_listener = pynput.keyboard.Listener(on_press=self.on_press)
