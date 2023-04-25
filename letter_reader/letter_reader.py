@@ -5,7 +5,8 @@ import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from contextlib import closing
 import subprocess
-
+import argparse
+import time
 
 HELP_STR = '''
 Welcome to Letter Presser
@@ -27,6 +28,7 @@ SPECIAL_KEY_MAP = {
     pynput.keyboard.KeyCode.from_char(','): "comma",
     pynput.keyboard.Key.shift: "shift",
     pynput.keyboard.Key.shift_r: "shift",
+    pynput.keyboard.Key.space: "space"
 }
 
 
@@ -34,8 +36,12 @@ def gen_filepath(speech):
     return os.path.join("./letter_mp3s", f"{speech}.mp3")
 
 
+def gen_word_filepath(speech):
+    return os.path.join("./word_mp3s", f"{speech}.mp3")
+
+
 class LetterReader:
-    def __init__(self):
+    def __init__(self, read_words=False):
         try:
             self.polly = boto3.Session(profile_name="adminuser").client("polly")
         except:
@@ -45,16 +51,26 @@ class LetterReader:
         self.keyboard_listener.start()
         self.letter_to_speak = None
         self.should_exit = False
-
+        self.read_words = read_words
+        print(self.read_words)
+        self.word_buffer = []
+        self.last_update_time = time.time()
 
     def run(self):
         while not self.should_exit:
             if self.letter_to_speak is not None:
-                self.speak(self.letter_to_speak)
+                self.word_buffer.append(self.letter_to_speak)
+                self.speak_letter(self.letter_to_speak)
+                self.last_update_time = time.time()
                 self.letter_to_speak = None
+            if self.read_words \
+                    and len(self.word_buffer) > 0 \
+                    and time.time() - self.last_update_time > 3:
+                self.speak_word(self.word_buffer)
+                self.word_buffer = []
+
         print("Exiting")
         return
-
 
     def on_press(self, key):
         if key == pynput.keyboard.Key.esc:
@@ -63,7 +79,7 @@ class LetterReader:
             return
         self.letter_to_speak = key
 
-    def generate_new_mp3(self, speech):
+    def generate_new_mp3(self, speech, filepath):
         if self.polly is None:
             return
 
@@ -77,13 +93,13 @@ class LetterReader:
             raise Exception("AudioStream not found")
 
         with closing(response["AudioStream"]) as stream:
-            output = gen_filepath(speech)
+            # output = gen_filepath(speech)
 
             # Open a file for writing the output as a binary stream
-            with open(output, "wb") as file:
+            with open(filepath, "wb") as file:
                 file.write(stream.read())
 
-    def speak(self, key):
+    def speak_letter(self, key):
         print(f"Speaking {key}")
         if key == pynput.keyboard.Key.esc:
             print("Raising exception")
@@ -97,16 +113,38 @@ class LetterReader:
             except AttributeError:
                 print("Exception!")
                 return
-
-        if not os.path.exists(gen_filepath(char)):
-            self.generate_new_mp3(char)
         fp = gen_filepath(char)
+        if not os.path.exists(gen_filepath(char)):
+            self.generate_new_mp3(char, fp)
+
         print(f"Opening file {fp}")
         subprocess.Popen(['mpg123', '-q', '--no-control', fp]).wait()
+
+    def speak_word(self, key_array: list):
+        print(f"Speaking {key_array}")
+
+        letter_array = [k.char for k in key_array]
+
+        word = "".join(letter_array)
+        print(word)
+        fp = gen_word_filepath(word)
+        self.generate_new_mp3(word, fp)
+        print(f"Opening file {fp}")
+        subprocess.Popen(['mpg123', '-q', '--no-control', fp]).wait()
+
+def get_parser():
+    parser = argparse.ArgumentParser(
+        prog='Letter Reader',
+        description='Reads letters when pressed. A good toy for kids'
+    )
+    parser.add_argument('--read_words', action='store_true', help='Read the word after the individual letters')
+    return parser
 
 
 if __name__ == "__main__":
     print(HELP_STR)
-    lr = LetterReader()
+    args = get_parser().parse_args()
+    print(args)
+    lr = LetterReader(args.read_words)
     # lr.generate_new_mp3("a")
     lr.run()
