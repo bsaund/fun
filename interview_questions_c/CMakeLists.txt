@@ -9,3 +9,4 @@ add_executable(first_missing_positive_integer first_missing_positive_integer.cpp
 add_executable(n_queens n_queens.cpp)
 add_executable(n_queens_sparse n_queens_sparse.cpp)
 add_executable(templating templating.cpp)
+add_executable(first_missing_positive_integer first_missing_positive.cpp)
