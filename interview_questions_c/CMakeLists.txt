@@ -9,8 +9,7 @@ add_executable(first_missing_positive_integer first_missing_positive_integer.cpp
 add_executable(n_queens n_queens.cpp)
 add_executable(n_queens_sparse n_queens_sparse.cpp)
 add_executable(templating templating.cpp)
-add_executable(first_missing_positive_integer first_missing_positive.cpp
-        valid_number.cpp
-        distinct_subsequences.cpp)
+add_executable(first_missing_positive_integer first_missing_positive.cpp)
 add_executable(valid_number valid_number.cpp)
 add_executable(distinct_subsequences distinct_subsequences.cpp)
+add_executable(best_time_to_buy_and_sell_stock_iv best_time_to_buy_and_sell_stock_iv.cpp)
