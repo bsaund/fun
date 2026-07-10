@@ -17,6 +17,7 @@ whatever is left over: frame = (sheet - grid - 2*border) / 2.
 """
 
 import argparse
+import functools
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -56,26 +57,20 @@ SPECIAL_LABELS = {
     "DL": "Double Letter",
 }
 
-# Actual stains on hand: Varathane Smoke, Varathane Red Oak, Varathane Early
-# American, and old Minwax Dark Walnut. Hex values are best-effort estimates
-# of how each looks on plywood -- eyeball against a real test swatch and
-# adjust with --tw-color/--dw-color/--tl-color/--dl-color.
-#
-# Allocation: Smoke is the only non-brown stain, so it goes to Double Letter
-# (the most common special square, 24 of them) where a distinct hue matters
-# most for quick recognition. Dark Walnut (darkest) anchors Triple Word, the
-# rarest/most dramatic square. Within each word/letter pair, triple is still
-# the darker stain (Dark Walnut < Red Oak; Early American < Smoke).
+# Final stain allocation. Hex values are best-effort estimates of how each
+# looks on plywood -- eyeball against a real test swatch and adjust with
+# --tw-color/--dw-color/--tl-color/--dl-color.
 STAIN_COLORS = {
     "TW": "#3b2415",   # Minwax Dark Walnut - darkest, anchors the 8 TW squares
-    "DW": "#a35a34",   # Varathane Red Oak - vibrant, highlights the diagonals
-    "TL": "#8a5c3c",   # Varathane Early American - lighter brown, close to Red Oak but less red
-    "DL": "#96907f",   # Varathane Smoke - lighter, more neutral gray (less blue) than first guess
+    "DW": "#8f2f22",   # General Finishes Cherry - vivid red
+    "TL": "#a35a34",   # Varathane Red Oak - medium brown
+    "DL": "#c79a5f",   # General Finishes Honey Maple - light honey/amber
 }
 
 
+@functools.lru_cache(maxsize=64)
 def _wood_grain_image(base_hex: str, height_in: float, width_in: float,
-                       ppi: float, rng: np.random.Generator) -> np.ndarray:
+                       ppi: float, seed: int) -> np.ndarray:
     """
     Procedurally render a wood-grain texture, sized in physical inches.
 
@@ -87,7 +82,12 @@ def _wood_grain_image(base_hex: str, height_in: float, width_in: float,
       - Cross-grain: several weaker layers at random angles from
         horizontal to vertical, so the texture isn't just uniform stripes.
       - A couple of knots (radial swirl + decay) for character.
+
+    Cached on its (hashable) arguments: this is the expensive part of
+    rendering the board, and callers -- like the Dash app -- often re-render
+    with the same texture but a different stain/frame color.
     """
+    rng = np.random.default_rng(seed)
     r, g, b = mcolors.to_rgb(base_hex)
 
     h_px, w_px = int(round(height_in * ppi)), int(round(width_in * ppi))
@@ -141,7 +141,7 @@ def draw_board(ax, sheet: float, square: float, n: int, line: float,
                 border: float, plywood_color: str, walnut_color: str,
                 frame_color: str, draw_frame: bool = True,
                 texture: bool = True, ppi: float = 30.0,
-                rng: np.random.Generator | None = None) -> float:
+                seed: int | None = None) -> float:
     """
     Draw the board onto `ax`. Returns the computed frame width.
 
@@ -150,8 +150,8 @@ def draw_board(ax, sheet: float, square: float, n: int, line: float,
                           ^ lines drawn at each of the n+1 boundaries,
                             extended to span the full border+grid zone.
     """
-    if rng is None:
-        rng = np.random.default_rng()
+    if seed is None:
+        seed = np.random.SeedSequence().entropy
 
     grid_span = n * square
     frame = (sheet - grid_span - 2 * border) / 2
@@ -171,7 +171,7 @@ def draw_board(ax, sheet: float, square: float, n: int, line: float,
 
     # Light plywood field: border + grid, inset from the frame.
     if texture:
-        img = _wood_grain_image(plywood_color, light_size, light_size, ppi, rng)
+        img = _wood_grain_image(plywood_color, light_size, light_size, ppi, seed)
         ax.imshow(
             img, extent=(light_lo, light_hi, light_lo, light_hi),
             origin="lower", interpolation="bilinear", zorder=1,
@@ -227,6 +227,35 @@ def draw_special_squares(ax, layout: list[list[str]], square: float, n: int,
             ))
 
 
+def _readable_text_color(hex_color: str) -> str:
+    """Pick black or white text, whichever contrasts against `hex_color`."""
+    r, g, b = mcolors.to_rgb(hex_color)
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    return "white" if luminance < 0.5 else "black"
+
+
+def draw_special_labels(ax, layout: list[list[str]], square: float, n: int,
+                         grid_lo: float, stain_colors: dict[str, str],
+                         fontsize: float = 9.0) -> None:
+    """
+    Overlay the TW/DW/TL/DL code at the center of each special square, in a
+    color that contrasts with that square's stain -- handy as a staining
+    reference sheet.
+    """
+    for row in range(n):
+        for col in range(n):
+            code = layout[row][col]
+            if code not in stain_colors:
+                continue
+            cx = grid_lo + (col + 0.5) * square
+            cy = grid_lo + (n - 1 - row + 0.5) * square
+            ax.text(
+                cx, cy, code, ha="center", va="center",
+                fontsize=fontsize, fontweight="bold",
+                color=_readable_text_color(stain_colors[code]), zorder=4,
+            )
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Visualize the scrabble-board wall art layout.",
@@ -251,22 +280,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tl-color", default=STAIN_COLORS["TL"], help="Triple Letter stain color")
     parser.add_argument("--dl-color", default=STAIN_COLORS["DL"], help="Double Letter stain color")
     parser.add_argument("--no-legend", dest="legend", action="store_false", help="Don't draw the stain-color legend")
+    parser.add_argument("--labels", action="store_true", help="Overlay TW/DW/TL/DL text on each special square (staining reference)")
     parser.add_argument("--save", metavar="PATH", help="Save the figure to PATH instead of showing it")
     parser.add_argument("--dpi", type=int, default=150, help="DPI when saving")
     return parser.parse_args()
 
 
-def main() -> None:
-    args = parse_args()
+def build_figure(args: argparse.Namespace) -> plt.Figure:
+    """Build the full board figure from a parsed/parsed-like args namespace.
 
-    rng = np.random.default_rng(args.seed)
-
+    Shared by the CLI (`main`) and the Dash app, so both stay driven by the
+    same set of options.
+    """
     fig, ax = plt.subplots(figsize=(9, 9))
     frame = draw_board(
         ax, sheet=args.sheet, square=args.square, n=args.n, line=args.line,
         border=args.border, plywood_color=args.plywood_color,
         walnut_color=args.walnut_color, frame_color=args.frame_color,
-        draw_frame=args.draw_frame, texture=args.texture, ppi=args.ppi, rng=rng,
+        draw_frame=args.draw_frame, texture=args.texture, ppi=args.ppi, seed=args.seed,
     )
 
     if args.specials:
@@ -279,6 +310,11 @@ def main() -> None:
             ax, SCRABBLE_LAYOUT, square=args.square, n=args.n, line=args.line,
             grid_lo=grid_lo, stain_colors=stain_colors, alpha=args.stain_alpha,
         )
+        if args.labels:
+            draw_special_labels(
+                ax, SCRABBLE_LAYOUT, square=args.square, n=args.n,
+                grid_lo=grid_lo, stain_colors=stain_colors,
+            )
         if args.legend:
             handles = [
                 mpatches.Patch(facecolor=stain_colors[code], alpha=args.stain_alpha, label=f"{code} – {SPECIAL_LABELS[code]}")
@@ -296,13 +332,22 @@ def main() -> None:
         f"{args.sheet}\" sheet  •  border {args.border}\"  •  frame {frame:.2f}\"",
         fontsize=11,
     )
+    plt.tight_layout()
+    return fig
+
+
+def main() -> None:
+    args = parse_args()
+
+    fig = build_figure(args)
 
     print(f"Grid span: {args.n * args.square}\"  |  Border: {args.border}\"  |  "
-          f"Computed frame width: {frame:.3f}\"  |  Sheet: {args.sheet}\"")
+          f"Computed frame width: "
+          f"{(args.sheet - args.n * args.square - 2 * args.border) / 2:.3f}\"  |  "
+          f"Sheet: {args.sheet}\"")
 
-    plt.tight_layout()
     if args.save:
-        plt.savefig(args.save, dpi=args.dpi)
+        fig.savefig(args.save, dpi=args.dpi)
         print(f"Saved to {args.save}")
     else:
         plt.show()
