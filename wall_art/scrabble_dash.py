@@ -11,13 +11,9 @@ Run with:
 """
 
 import argparse
-import base64
-import io
-
-import matplotlib
-matplotlib.use("Agg")  # non-interactive backend; must be set before scrabble imports pyplot
 
 import dash_daq as daq
+import plotly.graph_objects as go
 from dash import Dash, dcc, html, Input, Output
 
 import scrabble
@@ -115,10 +111,10 @@ color_store = dcc.Store(id="color-store", data=dict(_COLOR_DEFAULTS))
 
 layout_main = html.Div(
     [
-        html.Img(id="board-image", style={"maxWidth": "100%", "maxHeight": "100vh"}),
+        dcc.Graph(id="board-graph", style={"width": "100%", "height": "100%"},
+                  config={"displaylogo": False}),
     ],
-    style={"flex": "1", "display": "flex", "alignItems": "center", "justifyContent": "center",
-           "padding": "16px"},
+    style={"flex": "1", "padding": "16px", "height": "100vh", "boxSizing": "border-box"},
 )
 
 app.layout = html.Div(
@@ -181,8 +177,17 @@ app.clientside_callback(
 )
 
 
+def _error_figure(message: str) -> go.Figure:
+    fig = go.Figure()
+    fig.add_annotation(text=message, showarrow=False, font=dict(size=16, color="crimson"))
+    fig.update_xaxes(visible=False)
+    fig.update_yaxes(visible=False)
+    fig.update_layout(width=800, height=800, plot_bgcolor="white", paper_bgcolor="white")
+    return fig
+
+
 @app.callback(
-    Output("board-image", "src"),
+    Output("board-graph", "figure"),
     [
         Input("sheet", "value"),
         Input("square", "value"),
@@ -210,18 +215,9 @@ def _render_board(sheet, square, n, line, border, ppi, seed, stain_alpha, toggle
     )
 
     try:
-        fig = scrabble.build_figure(args)
+        return scrabble.build_figure(args)
     except ValueError as exc:
-        fig, ax = scrabble.plt.subplots(figsize=(9, 9))
-        ax.text(0.5, 0.5, str(exc), ha="center", va="center", wrap=True, fontsize=12, color="crimson")
-        ax.set_axis_off()
-
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=120)
-    scrabble.plt.close(fig)
-    buf.seek(0)
-    encoded = base64.b64encode(buf.read()).decode("ascii")
-    return f"data:image/png;base64,{encoded}"
+        return _error_figure(str(exc))
 
 
 if __name__ == "__main__":

@@ -17,12 +17,13 @@ whatever is left over: frame = (sheet - grid - 2*border) / 2.
 """
 
 import argparse
+import base64
 import functools
+import io
 
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-import matplotlib.patches as mpatches
+import plotly.graph_objects as go
+from PIL import Image
 
 PLYWOOD_COLOR = "#e8d3a0"
 WALNUT_COLOR = "#5c3a1e"
@@ -68,6 +69,18 @@ STAIN_COLORS = {
 }
 
 
+def _hex_to_rgb01(hex_color: str) -> tuple[float, float, float]:
+    """Parse '#rrggbb' (or 'rrggbb') into (r, g, b) floats in [0, 1]."""
+    h = hex_color.lstrip("#")
+    return tuple(int(h[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+
+
+def _hex_to_rgba(hex_color: str, alpha: float = 1.0) -> str:
+    """Parse '#rrggbb' into a Plotly-friendly 'rgba(r, g, b, a)' string."""
+    r, g, b = (round(c * 255) for c in _hex_to_rgb01(hex_color))
+    return f"rgba({r}, {g}, {b}, {alpha})"
+
+
 @functools.lru_cache(maxsize=64)
 def _wood_grain_image(base_hex: str, height_in: float, width_in: float,
                        ppi: float, seed: int) -> np.ndarray:
@@ -88,7 +101,7 @@ def _wood_grain_image(base_hex: str, height_in: float, width_in: float,
     with the same texture but a different stain/frame color.
     """
     rng = np.random.default_rng(seed)
-    r, g, b = mcolors.to_rgb(base_hex)
+    r, g, b = _hex_to_rgb01(base_hex)
 
     h_px, w_px = int(round(height_in * ppi)), int(round(width_in * ppi))
     y = np.arange(h_px, dtype=float)[:, None] / ppi   # inches
@@ -137,18 +150,38 @@ def _wood_grain_image(base_hex: str, height_in: float, width_in: float,
     return img
 
 
-def draw_board(ax, sheet: float, square: float, n: int, line: float,
+@functools.lru_cache(maxsize=64)
+def _wood_grain_data_uri(base_hex: str, height_in: float, width_in: float,
+                         ppi: float, seed: int) -> str:
+    """PNG data URI of `_wood_grain_image`, ready to embed as a layout image.
+
+    Flipped vertically because raster images are stored top-row-first, while
+    our array's row 0 is y=0 (the bottom of the plot).
+    """
+    img = _wood_grain_image(base_hex, height_in, width_in, ppi, seed)
+    rgb888 = np.flipud((img * 255).round().astype(np.uint8))
+    buf = io.BytesIO()
+    Image.fromarray(rgb888, mode="RGB").save(buf, format="png")
+    encoded = base64.b64encode(buf.getvalue()).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def draw_board(fig: go.Figure, sheet: float, square: float, n: int, line: float,
                 border: float, plywood_color: str, walnut_color: str,
                 frame_color: str, draw_frame: bool = True,
                 texture: bool = True, ppi: float = 30.0,
                 seed: int | None = None) -> float:
     """
-    Draw the board onto `ax`. Returns the computed frame width.
+    Draw the board onto `fig`. Returns the computed frame width.
 
     Layout along one axis:
       [ frame ][ border ][            grid (n squares)            ][ border ][ frame ]
                           ^ lines drawn at each of the n+1 boundaries,
                             extended to span the full border+grid zone.
+
+    The frame itself is just the plot's background color showing through the
+    ring outside the plywood field -- nothing else is drawn out there -- so
+    there's no need to stack a frame shape underneath the texture image.
     """
     if seed is None:
         seed = np.random.SeedSequence().entropy
@@ -165,42 +198,41 @@ def draw_board(ax, sheet: float, square: float, n: int, line: float,
     light_size = light_hi - light_lo
     grid_lo = frame + border
 
-    # Dark frame, full sheet, drawn first so everything else sits on top.
-    if draw_frame and frame > 0:
-        ax.add_patch(mpatches.Rectangle((0, 0), sheet, sheet, facecolor=frame_color, zorder=0))
+    fig.update_layout(plot_bgcolor=frame_color if draw_frame else "white")
 
     # Light plywood field: border + grid, inset from the frame.
     if texture:
-        img = _wood_grain_image(plywood_color, light_size, light_size, ppi, seed)
-        ax.imshow(
-            img, extent=(light_lo, light_hi, light_lo, light_hi),
-            origin="lower", interpolation="bilinear", zorder=1,
+        uri = _wood_grain_data_uri(plywood_color, light_size, light_size, ppi, seed)
+        fig.add_layout_image(
+            source=uri, x=light_lo, y=light_lo, sizex=light_size, sizey=light_size,
+            xref="x", yref="y", xanchor="left", yanchor="bottom",
+            sizing="stretch", layer="below",
         )
     else:
-        ax.add_patch(mpatches.Rectangle(
-            (light_lo, light_lo), light_size, light_size,
-            facecolor=plywood_color, zorder=1,
-        ))
+        fig.add_shape(
+            type="rect", x0=light_lo, y0=light_lo, x1=light_hi, y1=light_hi,
+            fillcolor=plywood_color, line_width=0, layer="below",
+        )
 
     # Dividing lines at each of the n+1 grid boundaries, spanning the full
     # light zone (border-to-border) so they run past the last square.
     for i in range(n + 1):
         pos = grid_lo + i * square - line / 2
         # Vertical line
-        ax.add_patch(mpatches.Rectangle(
-            (pos, light_lo), line, light_hi - light_lo,
-            facecolor=walnut_color, zorder=2,
-        ))
+        fig.add_shape(
+            type="rect", x0=pos, y0=light_lo, x1=pos + line, y1=light_hi,
+            fillcolor=walnut_color, line_width=0,
+        )
         # Horizontal line
-        ax.add_patch(mpatches.Rectangle(
-            (light_lo, pos), light_hi - light_lo, line,
-            facecolor=walnut_color, zorder=2,
-        ))
+        fig.add_shape(
+            type="rect", x0=light_lo, y0=pos, x1=light_hi, y1=pos + line,
+            fillcolor=walnut_color, line_width=0,
+        )
 
     return frame
 
 
-def draw_special_squares(ax, layout: list[list[str]], square: float, n: int,
+def draw_special_squares(fig: go.Figure, layout: list[list[str]], square: float, n: int,
                           line: float, grid_lo: float,
                           stain_colors: dict[str, str], alpha: float = 0.65) -> None:
     """
@@ -221,22 +253,22 @@ def draw_special_squares(ax, layout: list[list[str]], square: float, n: int,
                 continue
             x0 = grid_lo + col * square + inset
             y0 = grid_lo + (n - 1 - row) * square + inset
-            ax.add_patch(mpatches.Rectangle(
-                (x0, y0), cell, cell,
-                facecolor=stain_colors[code], alpha=alpha, linewidth=0, zorder=3,
-            ))
+            fig.add_shape(
+                type="rect", x0=x0, y0=y0, x1=x0 + cell, y1=y0 + cell,
+                fillcolor=_hex_to_rgba(stain_colors[code], alpha), line_width=0,
+            )
 
 
 def _readable_text_color(hex_color: str) -> str:
     """Pick black or white text, whichever contrasts against `hex_color`."""
-    r, g, b = mcolors.to_rgb(hex_color)
+    r, g, b = _hex_to_rgb01(hex_color)
     luminance = 0.299 * r + 0.587 * g + 0.114 * b
     return "white" if luminance < 0.5 else "black"
 
 
-def draw_special_labels(ax, layout: list[list[str]], square: float, n: int,
+def draw_special_labels(fig: go.Figure, layout: list[list[str]], square: float, n: int,
                          grid_lo: float, stain_colors: dict[str, str],
-                         fontsize: float = 9.0) -> None:
+                         fontsize: float = 14.0) -> None:
     """
     Overlay the TW/DW/TL/DL code at the center of each special square, in a
     color that contrasts with that square's stain -- handy as a staining
@@ -249,11 +281,23 @@ def draw_special_labels(ax, layout: list[list[str]], square: float, n: int,
                 continue
             cx = grid_lo + (col + 0.5) * square
             cy = grid_lo + (n - 1 - row + 0.5) * square
-            ax.text(
-                cx, cy, code, ha="center", va="center",
-                fontsize=fontsize, fontweight="bold",
-                color=_readable_text_color(stain_colors[code]), zorder=4,
+            fig.add_annotation(
+                x=cx, y=cy, text=code, showarrow=False,
+                font=dict(size=fontsize, color=_readable_text_color(stain_colors[code]), weight="bold"),
             )
+
+
+def draw_legend(fig: go.Figure, stain_colors: dict[str, str], alpha: float = 0.65) -> None:
+    """
+    Add clickable legend entries for the stain colors, via zero-data dummy
+    traces (shapes and images can't add themselves to a Plotly legend).
+    """
+    for code in ("TW", "DW", "TL", "DL"):
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None], mode="markers",
+            marker=dict(size=12, symbol="square", color=stain_colors[code], opacity=alpha),
+            name=f"{code} – {SPECIAL_LABELS[code]}", showlegend=True,
+        ))
 
 
 def parse_args() -> argparse.Namespace:
@@ -281,20 +325,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dl-color", default=STAIN_COLORS["DL"], help="Double Letter stain color")
     parser.add_argument("--no-legend", dest="legend", action="store_false", help="Don't draw the stain-color legend")
     parser.add_argument("--labels", action="store_true", help="Overlay TW/DW/TL/DL text on each special square (staining reference)")
-    parser.add_argument("--save", metavar="PATH", help="Save the figure to PATH instead of showing it")
-    parser.add_argument("--dpi", type=int, default=150, help="DPI when saving")
     return parser.parse_args()
 
 
-def build_figure(args: argparse.Namespace) -> plt.Figure:
+def build_figure(args: argparse.Namespace) -> go.Figure:
     """Build the full board figure from a parsed/parsed-like args namespace.
 
     Shared by the CLI (`main`) and the Dash app, so both stay driven by the
     same set of options.
     """
-    fig, ax = plt.subplots(figsize=(9, 9))
+    fig = go.Figure()
     frame = draw_board(
-        ax, sheet=args.sheet, square=args.square, n=args.n, line=args.line,
+        fig, sheet=args.sheet, square=args.square, n=args.n, line=args.line,
         border=args.border, plywood_color=args.plywood_color,
         walnut_color=args.walnut_color, frame_color=args.frame_color,
         draw_frame=args.draw_frame, texture=args.texture, ppi=args.ppi, seed=args.seed,
@@ -307,32 +349,29 @@ def build_figure(args: argparse.Namespace) -> plt.Figure:
         }
         grid_lo = frame + args.border
         draw_special_squares(
-            ax, SCRABBLE_LAYOUT, square=args.square, n=args.n, line=args.line,
+            fig, SCRABBLE_LAYOUT, square=args.square, n=args.n, line=args.line,
             grid_lo=grid_lo, stain_colors=stain_colors, alpha=args.stain_alpha,
         )
         if args.labels:
             draw_special_labels(
-                ax, SCRABBLE_LAYOUT, square=args.square, n=args.n,
+                fig, SCRABBLE_LAYOUT, square=args.square, n=args.n,
                 grid_lo=grid_lo, stain_colors=stain_colors,
             )
         if args.legend:
-            handles = [
-                mpatches.Patch(facecolor=stain_colors[code], alpha=args.stain_alpha, label=f"{code} – {SPECIAL_LABELS[code]}")
-                for code in ("TW", "DW", "TL", "DL")
-            ]
-            ax.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 0.0),
-                      ncol=4, frameon=False, fontsize=9)
+            draw_legend(fig, stain_colors, alpha=args.stain_alpha)
 
-    ax.set_xlim(0, args.sheet)
-    ax.set_ylim(0, args.sheet)
-    ax.set_aspect("equal")
-    ax.set_axis_off()
-    ax.set_title(
-        f"Scrabble board  •  {args.n}x{args.n} @ {args.square}\"  •  "
-        f"{args.sheet}\" sheet  •  border {args.border}\"  •  frame {frame:.2f}\"",
-        fontsize=11,
+    fig.update_xaxes(range=[0, args.sheet], visible=False, constrain="domain")
+    fig.update_yaxes(range=[0, args.sheet], visible=False, scaleanchor="x", scaleratio=1)
+    fig.update_layout(
+        title=dict(
+            text=(f"Scrabble board  •  {args.n}x{args.n} @ {args.square}\"  •  "
+                  f"{args.sheet}\" sheet  •  border {args.border}\"  •  frame {frame:.2f}\""),
+            font=dict(size=14),
+        ),
+        legend=dict(orientation="h", yanchor="top", y=-0.02, xanchor="center", x=0.5),
+        margin=dict(l=10, r=10, t=50, b=10),
+        width=800, height=800,
     )
-    plt.tight_layout()
     return fig
 
 
@@ -346,11 +385,7 @@ def main() -> None:
           f"{(args.sheet - args.n * args.square - 2 * args.border) / 2:.3f}\"  |  "
           f"Sheet: {args.sheet}\"")
 
-    if args.save:
-        fig.savefig(args.save, dpi=args.dpi)
-        print(f"Saved to {args.save}")
-    else:
-        plt.show()
+    fig.show()
 
 
 if __name__ == "__main__":
