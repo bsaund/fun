@@ -67,6 +67,9 @@ import pathlib
 import ezdxf
 import numpy as np
 from ezdxf.math import bulge_to_arc
+import matplotlib.patches as mpatches
+import matplotlib.path as mpath
+import matplotlib.pyplot as plt
 from matplotlib.font_manager import FontProperties
 from matplotlib.textpath import TextPath
 
@@ -85,6 +88,14 @@ POINT_VALUES = {
     "I": 1, "J": 8, "K": 5, "L": 1, "M": 3, "N": 1, "O": 1, "P": 3,
     "Q": 10, "R": 1, "S": 1, "T": 1, "U": 1, "V": 4, "W": 4, "X": 8,
     "Y": 4, "Z": 10,
+}
+
+# Per-letter horizontal nudge (inches) applied after cap-height centering --
+# only Q needs one: at true cap-height its tail dips into the point-value
+# corner, and shifting it left clears the ink without shrinking the letter,
+# lifting it off the shared baseline, or touching the point value at all.
+LETTER_NUDGE_X = {
+    "Q": -0.18,
 }
 
 DEFAULT_TILE_SIZE = 2.65        # inches. Grid spacing is 2.75".
@@ -134,8 +145,8 @@ def rounded_square_points(half: float, radius: float) -> list[tuple[float, float
     ]
 
 
-def text_glyph_rings(text: str, height: float, font_family: str,
-                      font_weight: str) -> tuple[list[np.ndarray], float]:
+def text_glyph_rings(text: str, height: float, font_family: str, font_weight: str,
+                      cap_reference: str | None = None) -> tuple[list[np.ndarray], float]:
     """
     Return `text`'s outline as a list of closed polygon rings, each an
     (N, 2) array of inch coordinates, centered on (0, 0) and scaled so it
@@ -147,6 +158,15 @@ def text_glyph_rings(text: str, height: float, font_family: str,
     as separate rings -- a laser just cuts every closed ring it's given, so
     no boolean subtraction against the tile square is needed here; the
     tile outline and the glyph rings are simply cut as independent paths.
+
+    By default the glyph's own bounding box is scaled to `height` and
+    centered on it. Letters with a descender (J, Q) dip below the
+    baseline, so their own bounding box is taller than a plain cap-height
+    letter's -- scaling *that* box to `height` shrinks the letter's main
+    body and centers it off the shared baseline. Pass `cap_reference` (e.g.
+    "H") to instead scale/center using a reference glyph's cap-height box,
+    so every letter sits on the same baseline at the same size and
+    descenders simply hang below it, as in normal typography.
     """
     if not text:
         return [], 0.0
@@ -155,8 +175,15 @@ def text_glyph_rings(text: str, height: float, font_family: str,
     rings = path.to_polygons()
 
     all_pts = np.concatenate(rings, axis=0)
-    y_min, y_max = all_pts[:, 1].min(), all_pts[:, 1].max()
     x_min, x_max = all_pts[:, 0].min(), all_pts[:, 0].max()
+
+    if cap_reference is not None:
+        ref_path = TextPath((0, 0), cap_reference, size=100, prop=prop)
+        ref_pts = np.concatenate(ref_path.to_polygons(), axis=0)
+        y_min, y_max = ref_pts[:, 1].min(), ref_pts[:, 1].max()
+    else:
+        y_min, y_max = all_pts[:, 1].min(), all_pts[:, 1].max()
+
     scale = height / (y_max - y_min)
     cx, cy = (x_min + x_max) / 2, (y_min + y_max) / 2
 
@@ -174,14 +201,24 @@ def tile_geometry(letter: str, tile_size: float, letter_height: float, letter_of
     `letter_offset_y` to leave room below it -- plus its Scrabble point
     value, right- and bottom-aligned into the corner that frees up. Blank
     tiles (`letter == ""`) get no cutouts at all.
+
+    Every letter is scaled/centered off a shared cap-height reference (see
+    `text_glyph_rings`), so e.g. Q's circular body matches O's size instead
+    of shrinking to fit its own descending tail. Q's tail still dips down
+    into the point-value corner at that size, so it gets a small nudge left
+    (LETTER_NUDGE_X) -- verified by rasterizing both shapes that the actual
+    ink clears the "10" by ~0.085", even though their bounding boxes still
+    overlap (the tail is a thin diagonal spike, not a solid block).
     """
     half = tile_size / 2
     square = rounded_square_points(half, corner_radius)
     if not letter:
         return square, []
 
-    letter_rings, _ = text_glyph_rings(letter, letter_height, font_family, font_weight)
-    rings = [ring + [0.0, letter_offset_y] for ring in letter_rings]
+    letter_rings, _ = text_glyph_rings(letter, letter_height, font_family, font_weight,
+                                        cap_reference="H")
+    nudge_x = LETTER_NUDGE_X.get(letter, 0.0)
+    rings = [ring + [nudge_x, letter_offset_y] for ring in letter_rings]
 
     point_rings, point_width = text_glyph_rings(str(POINT_VALUES[letter]), point_value_height,
                                                  font_family, font_weight)
@@ -278,6 +315,89 @@ def build_svg(tiles: list[tuple[list[tuple[float, float, float]], list[np.ndarra
     return "\n".join(svg), sheet_w, sheet_h
 
 
+def _rings_to_mpl_path(rings: list) -> mpath.Path:
+    """
+    One matplotlib compound Path covering every ring, filled with the
+    default nonzero-winding rule -- unlike the SVG/DXF output, there's no
+    evenodd fill-rule available for a plain PathPatch. This works out fine
+    here because matplotlib's own TextPath already winds each glyph's
+    outer contour and its counter(s) in opposite directions (verified by
+    checking signed ring area), which is exactly what nonzero-winding fill
+    needs to render a hole correctly.
+    """
+    verts, codes = [], []
+    for ring in rings:
+        verts.append(tuple(ring[0]))
+        codes.append(mpath.Path.MOVETO)
+        for pt in ring[1:]:
+            verts.append(tuple(pt))
+            codes.append(mpath.Path.LINETO)
+        verts.append(tuple(ring[0]))
+        codes.append(mpath.Path.CLOSEPOLY)
+    return mpath.Path(verts, codes)
+
+
+def write_eps_tile(square: list[tuple[float, float, float]], cutout_rings: list[np.ndarray],
+                    tile_size: float, path: pathlib.Path) -> None:
+    """
+    True-size vector EPS of one tile: blue tile-outline stroke plus the
+    letter/point-value as black OUTLINE strokes only, unfilled -- both the
+    outer boundary and any interior counter (e.g. the hole in "A" or "O")
+    come through as their own closed stroked curve, for someone filling
+    the letter in by hand rather than a fill/area engrave. Already just
+    raw polygon paths, not live text -- no font needed to open/print this.
+    """
+    half = tile_size / 2
+    fig = plt.figure(figsize=(tile_size, tile_size))
+    ax = fig.add_axes((0, 0, 1, 1))
+    outline = flatten_bulge_path(square)
+    ax.add_patch(mpatches.PathPatch(mpath.Path(outline + [outline[0]]),
+                                     facecolor="none", edgecolor="blue", linewidth=0.75))
+    if cutout_rings:
+        ax.add_patch(mpatches.PathPatch(_rings_to_mpl_path(cutout_rings),
+                                         facecolor="none", edgecolor="black", linewidth=0.75))
+    ax.set_xlim(-half, half)
+    ax.set_ylim(-half, half)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    fig.savefig(path, format="eps")
+    plt.close(fig)
+
+
+def write_print_pdf(square: list[tuple[float, float, float]], cutout_rings: list[np.ndarray],
+                     tile_size: float, letter: str, path: pathlib.Path) -> None:
+    """
+    One US-Letter page with the tile drawn at true 1:1 scale (outline
+    only, matching the EPS) plus a caption -- print at 100% ("actual
+    size", no "fit to page") and the printout is a real-size paper mockup
+    to check proportions by eye or hand to an engraver, no laser/vector
+    software required to view it.
+    """
+    half = tile_size / 2
+    page_w, page_h = 8.5, 11.0
+    fig = plt.figure(figsize=(page_w, page_h))
+    cx, cy = page_w / 2, page_h / 2 + 1
+    ax = fig.add_axes((0, 0, 1, 1))
+    outline = [(x + cx, y + cy) for x, y in flatten_bulge_path(square)]
+    ax.add_patch(mpatches.PathPatch(mpath.Path(outline + [outline[0]]),
+                                     facecolor="none", edgecolor="blue", linewidth=1))
+    if cutout_rings:
+        shifted = [ring + [cx, cy] for ring in cutout_rings]
+        ax.add_patch(mpatches.PathPatch(_rings_to_mpl_path(shifted),
+                                         facecolor="none", edgecolor="black", linewidth=1))
+    label = letter or "blank"
+    ax.text(cx, cy - half - 0.4, f'Scrabble tile "{label}" -- actual size {tile_size:.2f}" square',
+            ha="center", va="top", fontsize=11)
+    ax.text(cx, cy - half - 0.7, 'Print at 100% scale ("Actual size" -- NOT "Fit to page")',
+            ha="center", va="top", fontsize=10, style="italic")
+    ax.set_xlim(0, page_w)
+    ax.set_ylim(0, page_h)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    fig.savefig(path, format="pdf")
+    plt.close(fig)
+
+
 def sanitize_filename(letter: str, ext: str) -> str:
     return f"tile_{letter}.{ext}" if letter else f"tile_blank.{ext}"
 
@@ -295,17 +415,24 @@ def cmd_test(args: argparse.Namespace) -> None:
         add_tile(doc.modelspace(), square, cutout_rings)
         path = out_dir / sanitize_filename(args.letter, "dxf")
         doc.saveas(path)
-    else:
+    elif args.technique == "engrave":
         svg, _, _ = build_svg([(square, cutout_rings)], 1, 1, args.tile_size, args.spacing)
         path = out_dir / sanitize_filename(args.letter, "svg")
         path.write_text(svg)
+    else:  # eps -- a true-size vector file plus a 1:1 paper printout, e.g. for an outside engraver
+        path = out_dir / sanitize_filename(args.letter, "eps")
+        write_eps_tile(square, cutout_rings, args.tile_size, path)
+        pdf_path = out_dir / sanitize_filename(args.letter, "pdf").replace("tile_", "tile_print_")
+        write_print_pdf(square, cutout_rings, args.tile_size, args.letter, pdf_path)
     print(f"Wrote test tile for {args.letter!r} ({args.technique}) -> {path}")
     print(f"Tile size: {args.tile_size}\"  |  Letter height: {args.letter_height}\"  |  "
           f"Corner radius: {args.corner_radius}\"  |  Point value height: {args.point_value_height}\"")
     if args.technique == "cut":
         print("Cut this one first and check fit against a 2.75\" grid square before running --mode all.")
-    else:
+    elif args.technique == "engrave":
         print("Engrave this one first to check depth/legibility before running --mode all.")
+    else:
+        print(f"Also wrote a 1:1 print-at-home reference -> {pdf_path}")
 
 
 def square_grid(n: int) -> tuple[int, int]:
@@ -436,14 +563,17 @@ def cmd_all(args: argparse.Namespace) -> None:
               f"({sheet_w:.2f}\" x {sheet_h:.2f}\") -> {path}  [order this one first]")
         manifest_rows.append({
             "file": path.name, "part": f"{len(sample_tiles)} nested sample tiles (order first)",
-            "quantity": 1, "layer": f"top ({letter_desc})", "material": "black acrylic",
+            "quantity": 1, "layer": f"top ({letter_desc})", "material": args.material,
         })
 
     # Every remaining top-layer tile (letters + blanks), in the correct
     # quantity, split across sheets that fit within max_sheet_width x
     # max_sheet_height -- both dimensions, not just width. --num-sheets
     # forces more (smaller) sheets than the auto-computed minimum, e.g.
-    # for easier handling, but never fewer than fit.
+    # for easier handling, but never fewer than fit. Sheets are packed
+    # greedily -- each one filled to capacity before starting the next --
+    # rather than split evenly, to leave as few sheets as possible with
+    # material left over.
     tiles = build_tile_list(counts, args)
     capacity = max_cols * max_rows
     min_sheets = math.ceil(len(tiles) / capacity)
@@ -451,8 +581,11 @@ def cmd_all(args: argparse.Namespace) -> None:
     if args.num_sheets < min_sheets:
         print(f"Note: --num-sheets {args.num_sheets} is too few to fit {len(tiles)} tiles at "
               f"{max_cols}x{max_rows}/sheet ({capacity} tiles); using {n_sheets} sheets instead.")
-    chunk_size = math.ceil(len(tiles) / n_sheets)
-    chunks = [tiles[i:i + chunk_size] for i in range(0, len(tiles), chunk_size)]
+    chunks, i = [], 0
+    for s in range(n_sheets):
+        chunk_size = len(tiles) - i if s == n_sheets - 1 else min(capacity, len(tiles) - i)
+        chunks.append(tiles[i:i + chunk_size])
+        i += chunk_size
 
     for idx, chunk in enumerate(chunks, start=1):
         cols, rows = fit_grid(len(chunk), max_cols, max_rows)
@@ -463,34 +596,36 @@ def cmd_all(args: argparse.Namespace) -> None:
               f"({sheet_w:.2f}\" x {sheet_h:.2f}\") -> {path}")
         manifest_rows.append({
             "file": path.name, "part": f"{len(chunk)} nested letter/blank tiles", "quantity": 1,
-            "layer": f"top ({letter_desc})", "material": "black acrylic",
+            "layer": f"top ({letter_desc})", "material": args.material,
         })
 
-    # Backer square (copper middle layer + solid black bottom layer): plain,
-    # unmarked, and always DXF/cut regardless of --technique -- there's
-    # nothing to engrave on a backer. One repeated shape, so a single
-    # un-nested part is enough -- set quantity per material when ordering.
-    blank_square, _ = tile_geometry("", args.tile_size, args.letter_height, args.letter_offset_y,
-                                     args.point_value_height, args.point_margin,
-                                     args.corner_radius, args.font_family, args.font_weight)
-    blank_doc = new_doc()
-    add_tile(blank_doc.modelspace(), blank_square, [])
-    blank_path = out_dir / "tile_blank.dxf"
-    blank_doc.saveas(blank_path)
+    # Backer square (copper middle layer + solid black bottom layer): only
+    # relevant to the original 3-layer acrylic/copper/acrylic sandwich --
+    # --no-backer skips it entirely for a single-material design (e.g. a
+    # through-cut wood tile with nothing behind it).
+    if not args.no_backer:
+        blank_square, _ = tile_geometry("", args.tile_size, args.letter_height, args.letter_offset_y,
+                                         args.point_value_height, args.point_margin,
+                                         args.corner_radius, args.font_family, args.font_weight)
+        blank_doc = new_doc()
+        add_tile(blank_doc.modelspace(), blank_square, [])
+        blank_path = out_dir / "tile_blank.dxf"
+        blank_doc.saveas(blank_path)
 
-    manifest_rows += [
-        {"file": blank_path.name, "part": "backer square", "quantity": 100,
-         "layer": "middle", "material": "copper"},
-        {"file": blank_path.name, "part": "backer square", "quantity": 100,
-         "layer": "bottom", "material": "black acrylic"},
-    ]
+        manifest_rows += [
+            {"file": blank_path.name, "part": "backer square", "quantity": 100,
+             "layer": "middle", "material": "copper"},
+            {"file": blank_path.name, "part": "backer square", "quantity": 100,
+             "layer": "bottom", "material": "black acrylic"},
+        ]
+
     manifest_path = out_dir / "manifest.csv"
     with open(manifest_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["file", "part", "quantity", "layer", "material"])
         writer.writeheader()
         writer.writerows(manifest_rows)
 
-    print(f"Wrote tile_blank.dxf + manifest.csv -> {out_dir}/")
+    print(f"Wrote manifest.csv{'' if args.no_backer else ' + tile_blank.dxf'} -> {out_dir}/")
 
 
 def parse_args() -> argparse.Namespace:
@@ -501,9 +636,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mode", choices=["test", "sample", "all"], default="test",
                          help="'test' generates one letter; 'sample' nests a 3x3 varied test batch; "
                               "'all' nests the full tile set")
-    parser.add_argument("--technique", choices=["cut", "engrave"], default="cut",
+    parser.add_argument("--technique", choices=["cut", "engrave", "eps"], default="cut",
                          help="'cut' cuts the letter all the way through, as DXF; "
-                              "'engrave' area-engraves it into the surface, as SVG")
+                              "'engrave' area-engraves it into the surface, as SVG; "
+                              "'eps' (mode=test only) writes a true-size vector EPS plus a 1:1 "
+                              "print-at-home PDF, e.g. for an outside engraver")
     parser.add_argument("--letter", default="A",
                          help="Letter to generate in --mode test (use '' for a blank tile)")
     parser.add_argument("--output-dir", default="tile_cuts", help="Directory to write output files into")
@@ -536,6 +673,12 @@ def parse_args() -> argparse.Namespace:
                          help="Max sheet width per sheet, --mode all (inches)")
     parser.add_argument("--max-sheet-height", type=float, default=DEFAULT_MAX_SHEET_HEIGHT,
                          help="Max sheet height per sheet, --mode all (inches)")
+    parser.add_argument("--material", default="black acrylic",
+                         help="Top-layer material name recorded in manifest.csv, --mode all "
+                              "(e.g. 'cherry veneer MDF')")
+    parser.add_argument("--no-backer", action="store_true",
+                         help="--mode all: skip the copper/acrylic backer square (tile_blank.dxf) "
+                              "-- for a single-material design with nothing behind the top layer")
     return parser.parse_args()
 
 

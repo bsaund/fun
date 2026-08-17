@@ -20,6 +20,7 @@ import scrabble
 
 app = Dash(__name__)
 app.title = "Scrabble Board Wall Art"
+server = app.server  # exposed for a production WSGI server (e.g. `gunicorn scrabble_dash:server`)
 
 _COLOR_DEFAULTS = {
     "plywood_color": scrabble.PLYWOOD_COLOR,
@@ -31,6 +32,42 @@ _COLOR_DEFAULTS = {
     "dl_color": scrabble.STAIN_COLORS["DL"],
 }
 
+# Best-effort estimates of common wood/stain tones, offered as one-click
+# presets next to every color picker (plywood, dividers, frame, and all four
+# stains are all "pick a wood color" decisions).
+WOOD_PRESETS = {
+    "Birch": "#e8dcc0",
+    "Pine": "#d9c48f",
+    "Maple": "#e8d3a0",
+    "Golden Oak": "#c79a5f",
+    "Red Oak": "#a35a34",
+    "Cherry": "#8f2f22",
+    "Walnut": "#5c3a1e",
+    "Dark Walnut": "#3b2415",
+    "Mahogany": "#4a2418",
+    "Ebony": "#1c1108",
+}
+
+
+def _slug(name: str) -> str:
+    return name.lower().replace(" ", "-")
+
+
+def _preset_swatches(input_id: str):
+    return html.Div(
+        [
+            html.Button(
+                "", id=f"{input_id}-preset-{_slug(name)}", n_clicks=0, title=name,
+                style={"width": "18px", "height": "18px", "backgroundColor": hex_,
+                       "border": "1px solid #999", "borderRadius": "3px",
+                       "padding": "0", "cursor": "pointer", "marginRight": "3px",
+                       "marginBottom": "3px"},
+            )
+            for name, hex_ in WOOD_PRESETS.items()
+        ],
+        style={"display": "flex", "flexWrap": "wrap", "width": "150px", "marginTop": "4px"},
+    )
+
 
 def _color_row(label: str, input_id: str, default: str):
     return html.Div(
@@ -38,6 +75,7 @@ def _color_row(label: str, input_id: str, default: str):
             daq.ColorPicker(id=input_id, label=label, value={"hex": default}, size=150),
             html.Button("Reset to default", id=f"{input_id}-reset", n_clicks=0,
                         style={"marginTop": "4px", "width": "150px"}),
+            _preset_swatches(input_id),
         ],
         style={"marginBottom": "10px"},
     )
@@ -75,6 +113,16 @@ controls = html.Div(
         html.Hr(),
         html.H3("Stain squares"),
         _slider_row("Stain opacity", "stain-alpha", 0.0, 1.0, 0.05, 0.65),
+
+        html.Hr(),
+        html.H3("Center square"),
+        dcc.RadioItems(
+            id="center-style",
+            options=[{"label": f" {label}", "value": key}
+                     for key, label in scrabble.CENTER_STYLE_LABELS.items()],
+            value="double_word",
+            labelStyle={"display": "block", "marginBottom": "4px"},
+        ),
 
         html.Hr(),
         html.H3("Toggles"),
@@ -138,23 +186,28 @@ def _update_slider_labels(*values):
     return [str(v) for v in values]
 
 
-def _register_reset_callback(picker_id: str, default_hex: str) -> None:
+def _register_set_color_callback(picker_id: str, trigger_id: str, hex_value: str) -> None:
     @app.callback(
-        Output(picker_id, "value"),
-        Input(f"{picker_id}-reset", "n_clicks"),
+        Output(picker_id, "value", allow_duplicate=True),
+        Input(trigger_id, "n_clicks"),
         prevent_initial_call=True,
     )
-    def _reset(_n_clicks, default_hex=default_hex):
-        return {"hex": default_hex}
+    def _set_color(_n_clicks, hex_value=hex_value):
+        return {"hex": hex_value}
 
 
 for _picker_id, _key in zip(_COLOR_PICKER_IDS, _COLOR_PICKER_KEYS):
-    _register_reset_callback(_picker_id, _COLOR_DEFAULTS[_key])
+    _register_set_color_callback(_picker_id, f"{_picker_id}-reset", _COLOR_DEFAULTS[_key])
+    for _name, _hex in WOOD_PRESETS.items():
+        _register_set_color_callback(_picker_id, f"{_picker_id}-preset-{_slug(_name)}", _hex)
 
 
 # Color pickers fire onChange continuously while dragging. Debounce them
 # client-side into `color-store`, which is what actually drives a re-render,
 # so a drag doesn't queue up a full figure rebuild per mouse-move event.
+# Renders are now cheap (shapes are batched -- see scrabble.draw_board), so a
+# short debounce is enough to coalesce a drag without adding noticeable delay
+# to a single click.
 app.clientside_callback(
     """
     function(plywood, walnut, frame, tw, dw, tl, dl) {
@@ -167,7 +220,7 @@ app.clientside_callback(
         };
         window.__scrabbleColorTimer = setTimeout(function() {
             window.dash_clientside.set_props("color-store", {data: colors});
-        }, 250);
+        }, 80);
         return window.dash_clientside.no_update;
     }
     """,
@@ -197,18 +250,19 @@ def _error_figure(message: str) -> go.Figure:
         Input("ppi", "value"),
         Input("seed", "value"),
         Input("stain-alpha", "value"),
+        Input("center-style", "value"),
         Input("toggles", "value"),
         Input("color-store", "data"),
     ],
 )
-def _render_board(sheet, square, n, line, border, ppi, seed, stain_alpha, toggles, colors):
+def _render_board(sheet, square, n, line, border, ppi, seed, stain_alpha, center_style, toggles, colors):
     args = argparse.Namespace(
         sheet=sheet, square=square, n=int(n), line=line, border=border,
         draw_frame="draw_frame" in toggles,
         plywood_color=colors["plywood_color"], walnut_color=colors["walnut_color"],
         frame_color=colors["frame_color"],
         texture="texture" in toggles, ppi=ppi, seed=int(seed),
-        specials="specials" in toggles, stain_alpha=stain_alpha,
+        specials="specials" in toggles, stain_alpha=stain_alpha, center_style=center_style,
         tw_color=colors["tw_color"], dw_color=colors["dw_color"],
         tl_color=colors["tl_color"], dl_color=colors["dl_color"],
         legend="legend" in toggles, labels="labels" in toggles,

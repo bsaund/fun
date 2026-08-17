@@ -20,6 +20,7 @@ import argparse
 import base64
 import functools
 import io
+import math
 
 import numpy as np
 import plotly.graph_objects as go
@@ -68,6 +69,16 @@ STAIN_COLORS = {
     "DL": "#c79a5f",   # General Finishes Honey Maple - light honey/amber
 }
 
+# Options for how the board's center square (n // 2, n // 2) is treated,
+# overriding whatever SCRABBLE_LAYOUT says is there. "double_word" leaves it
+# untouched (the normal, board-accurate square).
+CENTER_STYLE_LABELS = {
+    "double_word": "Normal Double Word",
+    "blank": "No Stain",
+    "star": "Star",
+    "compass": "Compass Rose",
+}
+
 
 def _hex_to_rgb01(hex_color: str) -> tuple[float, float, float]:
     """Parse '#rrggbb' (or 'rrggbb') into (r, g, b) floats in [0, 1]."""
@@ -79,6 +90,49 @@ def _hex_to_rgba(hex_color: str, alpha: float = 1.0) -> str:
     """Parse '#rrggbb' into a Plotly-friendly 'rgba(r, g, b, a)' string."""
     r, g, b = (round(c * 255) for c in _hex_to_rgb01(hex_color))
     return f"rgba({r}, {g}, {b}, {alpha})"
+
+
+def _polygon_path(points: list[tuple[float, float]]) -> str:
+    """SVG path string for a closed polygon through `points`."""
+    return "M " + " L ".join(f"{x:.3f},{y:.3f}" for x, y in points) + " Z"
+
+
+def _star_path(cx: float, cy: float, outer_r: float, n_points: int = 5,
+               inner_ratio: float = 0.382, start_angle_deg: float = 90.0) -> str:
+    """SVG path for a simple `n_points`-pointed star centered at (cx, cy).
+
+    `inner_ratio` (0.382, the classic "golden" star proportion) sets the
+    inner-vertex radius as a fraction of `outer_r`.
+    """
+    inner_r = outer_r * inner_ratio
+    step = 180.0 / n_points
+    points = []
+    for i in range(n_points * 2):
+        angle = math.radians(start_angle_deg - i * step)
+        r = outer_r if i % 2 == 0 else inner_r
+        points.append((cx + r * math.cos(angle), cy + r * math.sin(angle)))
+    return _polygon_path(points)
+
+
+def _compass_rose_path(cx: float, cy: float, outer_r: float,
+                        short_ratio: float = 0.55, waist_ratio: float = 0.12,
+                        start_angle_deg: float = 90.0) -> str:
+    """
+    SVG path for an 8-point compass rose: long spikes at N/E/S/W, shorter
+    spikes at the diagonals, with a thin waist between each spike -- more
+    authentic-looking than a plain alternating star.
+    """
+    short_r = outer_r * short_ratio
+    waist_r = outer_r * waist_ratio
+    points = []
+    for i in range(8):
+        spike_angle_deg = start_angle_deg - i * 45.0
+        spike_r = outer_r if i % 2 == 0 else short_r
+        angle = math.radians(spike_angle_deg)
+        points.append((cx + spike_r * math.cos(angle), cy + spike_r * math.sin(angle)))
+        waist_angle = math.radians(spike_angle_deg - 22.5)
+        points.append((cx + waist_r * math.cos(waist_angle), cy + waist_r * math.sin(waist_angle)))
+    return _polygon_path(points)
 
 
 @functools.lru_cache(maxsize=64)
@@ -170,9 +224,13 @@ def draw_board(fig: go.Figure, sheet: float, square: float, n: int, line: float,
                 border: float, plywood_color: str, walnut_color: str,
                 frame_color: str, draw_frame: bool = True,
                 texture: bool = True, ppi: float = 30.0,
-                seed: int | None = None) -> float:
+                seed: int | None = None) -> tuple[float, list[dict]]:
     """
-    Draw the board onto `fig`. Returns the computed frame width.
+    Set up `fig`'s background/texture image and return (frame width, grid-line
+    shape dicts). Shapes are returned rather than added one-by-one via
+    `fig.add_shape` -- that method re-validates and deep-copies the *entire*
+    existing shapes list on every call, making a loop of them O(n^2); building
+    a plain list and assigning it to `fig.layout.shapes` once is O(n).
 
     Layout along one axis:
       [ frame ][ border ][            grid (n squares)            ][ border ][ frame ]
@@ -200,6 +258,8 @@ def draw_board(fig: go.Figure, sheet: float, square: float, n: int, line: float,
 
     fig.update_layout(plot_bgcolor=frame_color if draw_frame else "white")
 
+    shapes = []
+
     # Light plywood field: border + grid, inset from the frame.
     if texture:
         uri = _wood_grain_data_uri(plywood_color, light_size, light_size, ppi, seed)
@@ -209,54 +269,92 @@ def draw_board(fig: go.Figure, sheet: float, square: float, n: int, line: float,
             sizing="stretch", layer="below",
         )
     else:
-        fig.add_shape(
+        shapes.append(dict(
             type="rect", x0=light_lo, y0=light_lo, x1=light_hi, y1=light_hi,
             fillcolor=plywood_color, line_width=0, layer="below",
-        )
+        ))
 
     # Dividing lines at each of the n+1 grid boundaries, spanning the full
     # light zone (border-to-border) so they run past the last square.
     for i in range(n + 1):
         pos = grid_lo + i * square - line / 2
         # Vertical line
-        fig.add_shape(
+        shapes.append(dict(
             type="rect", x0=pos, y0=light_lo, x1=pos + line, y1=light_hi,
             fillcolor=walnut_color, line_width=0,
-        )
+        ))
         # Horizontal line
-        fig.add_shape(
+        shapes.append(dict(
             type="rect", x0=light_lo, y0=pos, x1=light_hi, y1=pos + line,
             fillcolor=walnut_color, line_width=0,
-        )
+        ))
 
-    return frame
+    return frame, shapes
 
 
-def draw_special_squares(fig: go.Figure, layout: list[list[str]], square: float, n: int,
+def draw_special_squares(layout: list[list[str]], square: float, n: int,
                           line: float, grid_lo: float,
-                          stain_colors: dict[str, str], alpha: float = 0.65) -> None:
+                          stain_colors: dict[str, str], alpha: float = 0.65,
+                          center_rc: tuple[int, int] | None = None,
+                          center_style: str = "double_word") -> list[dict]:
     """
     Stain each special square (TW/DW/TL/DL) from `layout` inside its cell,
     inset by half a line-width on each side so the walnut dividers stay
-    visible around it.
+    visible around it. Returns shape dicts (see `draw_board` for why).
 
     `layout[row][col]` uses row 0 = top of the board (as it's normally
     drawn); the plot's y-axis increases upward, so row r is placed at
     grid position (n - 1 - r).
+
+    `center_rc`/`center_style` override whatever `layout` says at that one
+    cell: "blank" skips it entirely, "star"/"compass" force it to the DW
+    color (an ornament is drawn on top separately, by `draw_center_ornament`)
+    regardless of what code is actually there.
     """
     inset = line / 2
     cell = square - line
+    shapes = []
     for row in range(n):
         for col in range(n):
             code = layout[row][col]
-            if code not in stain_colors:
+            is_center = (row, col) == center_rc
+            if is_center and center_style != "double_word":
+                if center_style == "blank":
+                    continue
+                fill_hex = stain_colors["DW"]
+            elif code in stain_colors:
+                fill_hex = stain_colors[code]
+            else:
                 continue
             x0 = grid_lo + col * square + inset
             y0 = grid_lo + (n - 1 - row) * square + inset
-            fig.add_shape(
+            shapes.append(dict(
                 type="rect", x0=x0, y0=y0, x1=x0 + cell, y1=y0 + cell,
-                fillcolor=_hex_to_rgba(stain_colors[code], alpha), line_width=0,
-            )
+                fillcolor=_hex_to_rgba(fill_hex, alpha), line_width=0,
+            ))
+    return shapes
+
+
+def draw_center_ornament(square: float, n: int, line: float, grid_lo: float,
+                          center_rc: tuple[int, int], center_style: str,
+                          stain_colors: dict[str, str]) -> list[dict]:
+    """
+    Draw a star or compass-rose ornament on top of the center square, in a
+    color that contrasts with its (DW) stain. Returns a single-element shape
+    list, or [] for styles that don't have an ornament.
+    """
+    if center_style not in ("star", "compass"):
+        return []
+    row, col = center_rc
+    cx = grid_lo + (col + 0.5) * square
+    cy = grid_lo + (n - 1 - row + 0.5) * square
+    outer_r = (square - line) * 0.42
+    color = _readable_text_color(stain_colors["DW"])
+    if center_style == "star":
+        path = _star_path(cx, cy, outer_r, n_points=5)
+    else:
+        path = _compass_rose_path(cx, cy, outer_r)
+    return [dict(type="path", path=path, fillcolor=color, line_width=0)]
 
 
 def _readable_text_color(hex_color: str) -> str:
@@ -266,25 +364,34 @@ def _readable_text_color(hex_color: str) -> str:
     return "white" if luminance < 0.5 else "black"
 
 
-def draw_special_labels(fig: go.Figure, layout: list[list[str]], square: float, n: int,
+def draw_special_labels(layout: list[list[str]], square: float, n: int,
                          grid_lo: float, stain_colors: dict[str, str],
-                         fontsize: float = 14.0) -> None:
+                         fontsize: float = 14.0,
+                         center_rc: tuple[int, int] | None = None,
+                         center_style: str = "double_word") -> list[dict]:
     """
     Overlay the TW/DW/TL/DL code at the center of each special square, in a
     color that contrasts with that square's stain -- handy as a staining
-    reference sheet.
+    reference sheet. Returns annotation dicts (see `draw_board` for why).
+
+    Skips the center square when it has an ornament/is blank (`center_style`
+    != "double_word"), since a text label would just clutter it up.
     """
+    annotations = []
     for row in range(n):
         for col in range(n):
             code = layout[row][col]
             if code not in stain_colors:
                 continue
+            if (row, col) == center_rc and center_style != "double_word":
+                continue
             cx = grid_lo + (col + 0.5) * square
             cy = grid_lo + (n - 1 - row + 0.5) * square
-            fig.add_annotation(
+            annotations.append(dict(
                 x=cx, y=cy, text=code, showarrow=False,
                 font=dict(size=fontsize, color=_readable_text_color(stain_colors[code]), weight="bold"),
-            )
+            ))
+    return annotations
 
 
 def draw_legend(fig: go.Figure, stain_colors: dict[str, str], alpha: float = 0.65) -> None:
@@ -325,6 +432,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--dl-color", default=STAIN_COLORS["DL"], help="Double Letter stain color")
     parser.add_argument("--no-legend", dest="legend", action="store_false", help="Don't draw the stain-color legend")
     parser.add_argument("--labels", action="store_true", help="Overlay TW/DW/TL/DL text on each special square (staining reference)")
+    parser.add_argument("--center-style", choices=list(CENTER_STYLE_LABELS), default="double_word",
+                         help="How to treat the center square")
     return parser.parse_args()
 
 
@@ -335,12 +444,13 @@ def build_figure(args: argparse.Namespace) -> go.Figure:
     same set of options.
     """
     fig = go.Figure()
-    frame = draw_board(
+    frame, shapes = draw_board(
         fig, sheet=args.sheet, square=args.square, n=args.n, line=args.line,
         border=args.border, plywood_color=args.plywood_color,
         walnut_color=args.walnut_color, frame_color=args.frame_color,
         draw_frame=args.draw_frame, texture=args.texture, ppi=args.ppi, seed=args.seed,
     )
+    annotations = []
 
     if args.specials:
         stain_colors = {
@@ -348,17 +458,27 @@ def build_figure(args: argparse.Namespace) -> go.Figure:
             "TL": args.tl_color, "DL": args.dl_color,
         }
         grid_lo = frame + args.border
-        draw_special_squares(
-            fig, SCRABBLE_LAYOUT, square=args.square, n=args.n, line=args.line,
+        center_rc = (args.n // 2, args.n // 2)
+        shapes += draw_special_squares(
+            SCRABBLE_LAYOUT, square=args.square, n=args.n, line=args.line,
             grid_lo=grid_lo, stain_colors=stain_colors, alpha=args.stain_alpha,
+            center_rc=center_rc, center_style=args.center_style,
+        )
+        shapes += draw_center_ornament(
+            square=args.square, n=args.n, line=args.line, grid_lo=grid_lo,
+            center_rc=center_rc, center_style=args.center_style,
+            stain_colors=stain_colors,
         )
         if args.labels:
-            draw_special_labels(
-                fig, SCRABBLE_LAYOUT, square=args.square, n=args.n,
+            annotations += draw_special_labels(
+                SCRABBLE_LAYOUT, square=args.square, n=args.n,
                 grid_lo=grid_lo, stain_colors=stain_colors,
+                center_rc=center_rc, center_style=args.center_style,
             )
         if args.legend:
             draw_legend(fig, stain_colors, alpha=args.stain_alpha)
+
+    fig.update_layout(shapes=shapes, annotations=annotations)
 
     fig.update_xaxes(range=[0, args.sheet], visible=False, constrain="domain")
     fig.update_yaxes(range=[0, args.sheet], visible=False, scaleanchor="x", scaleratio=1)

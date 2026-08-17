@@ -1,0 +1,3 @@
+# OAuth credentials — never commit
+oauth_client_secret.json
+client_secret*.json
