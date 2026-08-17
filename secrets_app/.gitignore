@@ -1,0 +1,4 @@
+# Secrets — never commit
+env.yaml
+client_secret*.json
+oauth_client_secret.json
